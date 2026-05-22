@@ -28,3 +28,18 @@ body::before {
   pointer-events: none;
   z-index: 0;
 }
+
+@keyframes lyricsSlideIn {
+  from {
+    transform: translateY(32px);
+    opacity: 0.3;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.lyrics-slide-in {
+  animation: lyricsSlideIn 300ms ease-out forwards;
+}

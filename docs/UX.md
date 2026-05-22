@@ -226,8 +226,9 @@ v1 has three screens: **Picker → Generating → Karaoke**
 
 **Line display:**
 - 3 lyric units: previous (20% opacity), current (full opacity + violet glow bar), next (40% opacity)
-- Lines slide upward smoothly, 300ms ease-out
+- When the active line changes, the incoming block slides up from below over 300ms ease-out (`translateY(32px) → 0, opacity 0.3 → 1`)
 - Font readable from 3 meters: 52px generated, 22px original on desktop
+- **Word-level highlight:** within the current active line, the word currently being sung is highlighted in amber (`#FCD34D`) with a soft golden glow. Timing is syllable-proportional: each word's highlight duration = `(word.syllables / totalSyllables) × lineDurationMs`
 
 **Progress bar (fixed bottom):**
 - Full-width, 6px height, gradient fill (`#7C3AED → #06B6D4`) on `bg-card` track
@@ -240,11 +241,13 @@ v1 has three screens: **Picker → Generating → Karaoke**
 
 Each lyric unit is a **generated line paired with its original below it**, aligned syllable-by-syllable in a shared CSS grid.
 
+**Row splitting:** If a line has more syllables than fit on one screen row, it splits into multiple sub-rows. The split happens at syllable-column boundaries — both generated and original split at exactly the same position, so alignment is never lost. Max syllables per visual row is calculated from container width (≈ `containerWidth / 90px`, minimum 4). Each sub-row is its own grid:
+
 ```css
-grid-template-columns: repeat(N, 1fr)  /* N = total syllable count */
+grid-template-columns: repeat(N, 1fr)  /* N = syllables in this sub-row */
 ```
 
-Each word's `grid-column` is `startSyllable / span syllableCount`. Both rows share the grid — syllables align vertically.
+Each word's `grid-column` is `span syllableCount`. Generated row sits directly above its paired original row within the same sub-row grid. Both rows share the column template — syllables align vertically.
 
 ```
 col:   1       2       3       4       5

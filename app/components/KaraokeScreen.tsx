@@ -1,13 +1,17 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Song, Dataset, LyricLine } from '@/app/types';
+import { Song, Dataset, LyricLine, GeneratedWord } from '@/app/types';
+
+// Max syllables before a line splits into a new visual sub-row.
+// Both generated and original split at the same syllable boundary.
+const MAX_SYLLABLES_PER_ROW = 8;
 
 const MOCK_LYRICS: LyricLine[] = [
   {
     lineIndex: 0,
     startMs: 0,
-    syllableCount: 6,
+    syllableCount: 5,
     original: [
       { word: 'Is', syllables: 1 },
       { word: 'this', syllables: 1 },
@@ -66,23 +70,17 @@ const MOCK_LYRICS: LyricLine[] = [
   {
     lineIndex: 3,
     startMs: 7630,
-    syllableCount: 7,
+    syllableCount: 8,
     original: [
       { word: 'No', syllables: 1 },
-      { word: 'es-', syllables: 1 },
-      { word: 'cape', syllables: 1 },
+      { word: 'es-cape', syllables: 2 },
       { word: 'from', syllables: 1 },
-      { word: 're-', syllables: 1 },
-      { word: 'a-', syllables: 1 },
-      { word: 'li-ty', syllables: 2 },
+      { word: 're-al-i-ty', syllables: 4 },
     ],
     generated: [
-      { word: 'In-', syllables: 1 },
-      { word: 'sert', syllables: 1 },
-      { word: 'screw', syllables: 1 },
-      { word: 'type', syllables: 1 },
-      { word: 'A', syllables: 1 },
-      { word: 'here', syllables: 1 },
+      { word: 'Check', syllables: 1 },
+      { word: 'the', syllables: 1 },
+      { word: 'di-a-gram', syllables: 3 },
       { word: 'care-ful-ly', syllables: 3 },
     ],
   },
@@ -91,41 +89,55 @@ const MOCK_LYRICS: LyricLine[] = [
     startMs: 10220,
     syllableCount: 4,
     original: [
-      { word: 'O-', syllables: 1 },
-      { word: 'pen', syllables: 1 },
+      { word: 'O-pen', syllables: 2 },
       { word: 'your', syllables: 1 },
       { word: 'eyes', syllables: 1 },
     ],
     generated: [
-      { word: 'Al-', syllables: 1 },
-      { word: 'len', syllables: 1 },
+      { word: 'Al-len', syllables: 2 },
       { word: 'key', syllables: 1 },
       { word: 'here', syllables: 1 },
     ],
   },
 ];
 
-interface KaraokeScreenProps {
-  song: Song;
-  dataset: Dataset;
-  lyrics: LyricLine[];
-  onRegenerate: () => void;
-  onNewCombo: () => void;
+// Compute how many syllables go in each visual row given a max per row.
+function computeRowSizes(totalSyllables: number, maxPerRow: number): number[] {
+  const rows: number[] = [];
+  let remaining = totalSyllables;
+  while (remaining > 0) {
+    rows.push(Math.min(remaining, maxPerRow));
+    remaining -= maxPerRow;
+  }
+  return rows;
 }
 
-function formatTime(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
+// Split words greedily into rows matching the given row sizes.
+// Generated and original must use the same rowSizes so they wrap together.
+function splitWordsIntoRows(words: GeneratedWord[], rowSizes: number[]): GeneratedWord[][] {
+  const rows: GeneratedWord[][] = [];
+  let wordIdx = 0;
+  for (const targetSize of rowSizes) {
+    const row: GeneratedWord[] = [];
+    let rowSyls = 0;
+    while (wordIdx < words.length && rowSyls + words[wordIdx].syllables <= targetSize) {
+      row.push(words[wordIdx]);
+      rowSyls += words[wordIdx].syllables;
+      wordIdx++;
+    }
+    if (row.length > 0) rows.push(row);
+  }
+  if (wordIdx < words.length) rows.push(words.slice(wordIdx));
+  return rows;
 }
 
 interface LyricRowProps {
   line: LyricLine;
   role: 'prev' | 'current' | 'next';
+  highlightedWordIndex?: number;
 }
 
-function LyricRow({ line, role }: LyricRowProps) {
+function LyricRow({ line, role, highlightedWordIndex }: LyricRowProps) {
   const isCurrent = role === 'current';
   const isPrev = role === 'prev';
 
@@ -133,11 +145,16 @@ function LyricRow({ line, role }: LyricRowProps) {
   const genFontSize = isCurrent ? '52px' : '36px';
   const genFontWeight = isCurrent ? 800 : 700;
   const origFontSize = isCurrent ? '22px' : '16px';
-  const origFontWeight = isCurrent ? 400 : 400;
   const wordColor = isCurrent ? '#F8FAFC' : '#3F3F46';
   const origColor = isCurrent ? '#94A3B8' : '#3F3F46';
 
-  const syllableCount = line.syllableCount || line.generated.length;
+  // Derive syllable count from actual words — robust against mismatched metadata
+  const totalSyllables = line.generated.reduce((s, w) => s + w.syllables, 0);
+  const rowSizes = computeRowSizes(totalSyllables, MAX_SYLLABLES_PER_ROW);
+  const genRows = splitWordsIntoRows(line.generated, rowSizes);
+  const origRows = splitWordsIntoRows(line.original, rowSizes);
+
+  let wordOffset = 0;
 
   return (
     <div
@@ -147,63 +164,93 @@ function LyricRow({ line, role }: LyricRowProps) {
         borderRadius: '8px',
         background: isCurrent ? 'rgba(167,139,250,0.12)' : 'transparent',
         boxShadow: isCurrent ? '0 0 24px rgba(167,139,250,0.4)' : 'none',
-        transition: isCurrent
-          ? 'opacity 150ms ease, background 150ms ease, box-shadow 150ms ease'
-          : 'opacity 150ms ease',
+        transition: 'opacity 150ms ease, background 150ms ease, box-shadow 150ms ease',
       }}
     >
-      {/* Generated line */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${syllableCount}, 1fr)`,
-          gap: '4px',
-          marginBottom: '4px',
-        }}
-      >
-        {line.generated.map((word, i) => (
-          <span
-            key={i}
-            style={{
-              gridColumn: `span ${word.syllables}`,
-              fontSize: genFontSize,
-              fontWeight: genFontWeight,
-              color: wordColor,
-              textAlign: 'center',
-              lineHeight: 1.1,
-            }}
-          >
-            {word.word}
-          </span>
-        ))}
-      </div>
+      {rowSizes.map((_, rowIdx) => {
+        const genRow = genRows[rowIdx] ?? [];
+        const origRow = origRows[rowIdx] ?? [];
+        const rowStartWordIdx = wordOffset;
+        wordOffset += genRow.length;
+        const rowCols = genRow.reduce((s, w) => s + w.syllables, 0);
 
-      {/* Original line */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${syllableCount}, 1fr)`,
-          gap: '4px',
-        }}
-      >
-        {line.original.map((word, i) => (
-          <span
-            key={i}
-            style={{
-              gridColumn: `span ${word.syllables}`,
-              fontSize: origFontSize,
-              fontWeight: origFontWeight,
-              color: origColor,
-              textAlign: 'center',
-              lineHeight: 1.4,
-            }}
-          >
-            {word.word}
-          </span>
-        ))}
-      </div>
+        return (
+          <div key={rowIdx} style={{ marginBottom: rowIdx < rowSizes.length - 1 ? '12px' : 0 }}>
+            {/* Generated line */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${rowCols}, 1fr)`,
+                gap: '4px',
+                marginBottom: '4px',
+              }}
+            >
+              {genRow.map((word, wIdx) => {
+                const globalIdx = rowStartWordIdx + wIdx;
+                const isHighlighted = isCurrent && highlightedWordIndex === globalIdx;
+                return (
+                  <span
+                    key={wIdx}
+                    style={{
+                      gridColumn: `span ${word.syllables}`,
+                      fontSize: genFontSize,
+                      fontWeight: genFontWeight,
+                      color: isHighlighted ? '#FCD34D' : wordColor,
+                      textShadow: isHighlighted ? '0 0 20px rgba(252,211,77,0.5)' : 'none',
+                      textAlign: 'center',
+                      lineHeight: 1.1,
+                      transition: 'color 80ms ease, text-shadow 80ms ease',
+                    }}
+                  >
+                    {word.word}
+                  </span>
+                );
+              })}
+            </div>
+
+            {/* Original line — same grid as generated, so syllables align vertically */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${rowCols}, 1fr)`,
+                gap: '4px',
+              }}
+            >
+              {origRow.map((word, wIdx) => (
+                <span
+                  key={wIdx}
+                  style={{
+                    gridColumn: `span ${word.syllables}`,
+                    fontSize: origFontSize,
+                    fontWeight: 400,
+                    color: origColor,
+                    textAlign: 'center',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {word.word}
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
+}
+
+interface KaraokeScreenProps {
+  song: Song;
+  dataset: Dataset;
+  lyrics: LyricLine[];
+  onRegenerate: () => void;
+  onNewCombo: () => void;
+}
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 export default function KaraokeScreen({
@@ -216,37 +263,56 @@ export default function KaraokeScreen({
   const displayLyrics = lyrics.length > 0 ? lyrics : MOCK_LYRICS;
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
+  const [highlightedWordIndex, setHighlightedWordIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Phase 1: cycle through lines every 3s when playing
+  const LINE_DURATION_MS = 3000;
+
+  // Phase 1: cycle through lines every 3s
   useEffect(() => {
     if (!isPlaying) return;
-
     intervalRef.current = setInterval(() => {
       setCurrentLineIndex((i) => (i + 1) % displayLyrics.length);
-    }, 3000);
-
+    }, LINE_DURATION_MS);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [isPlaying, displayLyrics.length]);
 
+  // Word highlight: advance each word proportionally by its syllable count
+  useEffect(() => {
+    if (!isPlaying) return;
+    setHighlightedWordIndex(0);
+
+    const line = displayLyrics[currentLineIndex];
+    const totalSyllables = line.generated.reduce((s, w) => s + w.syllables, 0);
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+    let cumSyllables = 0;
+
+    line.generated.forEach((word, i) => {
+      const startMs = (cumSyllables / totalSyllables) * LINE_DURATION_MS;
+      if (startMs > 0) {
+        timeouts.push(setTimeout(() => setHighlightedWordIndex(i), startMs));
+      }
+      cumSyllables += word.syllables;
+    });
+
+    return () => timeouts.forEach(clearTimeout);
+  }, [currentLineIndex, isPlaying, displayLyrics]);
+
   const handlePlay = () => {
     setCurrentLineIndex(0);
+    setHighlightedWordIndex(0);
     setIsPlaying(true);
   };
-
-  // Total duration from song metadata
-  const totalDuration = formatTime(song.durationSeconds * 1000);
 
   const prevLine = currentLineIndex > 0 ? displayLyrics[currentLineIndex - 1] : null;
   const currentLine = displayLyrics[currentLineIndex];
   const nextLine =
-    currentLineIndex < displayLyrics.length - 1
-      ? displayLyrics[currentLineIndex + 1]
-      : null;
+    currentLineIndex < displayLyrics.length - 1 ? displayLyrics[currentLineIndex + 1] : null;
 
   const comboLabel = `🎵 ${song.title} × 📋 ${dataset.label}`;
+  const totalDuration = formatTime(song.durationSeconds);
 
   return (
     <div
@@ -320,7 +386,7 @@ export default function KaraokeScreen({
         </div>
       </div>
 
-      {/* Main content area */}
+      {/* Main content */}
       <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden' }}>
         {/* YouTube placeholder — top right */}
         <div
@@ -344,7 +410,7 @@ export default function KaraokeScreen({
           ▶ YouTube
         </div>
 
-        {/* Lyric area — fills remaining space, vertically centered */}
+        {/* Lyric area */}
         <div
           style={{
             flex: 1,
@@ -355,7 +421,6 @@ export default function KaraokeScreen({
           }}
         >
           {!isPlaying ? (
-            /* Before play state */
             <button
               onClick={handlePlay}
               style={{
@@ -373,18 +438,20 @@ export default function KaraokeScreen({
               ▶ Play
             </button>
           ) : (
-            /* Lyric display: prev / current / next */
+            // key change triggers the CSS slide-in animation on every line advance
             <div
-              style={{
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-                transition: 'transform 300ms ease-out',
-              }}
+              key={currentLineIndex}
+              className="lyrics-slide-in"
+              style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}
             >
               {prevLine && <LyricRow line={prevLine} role="prev" />}
-              {currentLine && <LyricRow line={currentLine} role="current" />}
+              {currentLine && (
+                <LyricRow
+                  line={currentLine}
+                  role="current"
+                  highlightedWordIndex={highlightedWordIndex}
+                />
+              )}
               {nextLine && <LyricRow line={nextLine} role="next" />}
             </div>
           )}
@@ -403,7 +470,6 @@ export default function KaraokeScreen({
           borderTop: '1px solid rgba(255,255,255,0.08)',
         }}
       >
-        {/* Progress bar track */}
         <div
           style={{
             flex: 1,
@@ -422,8 +488,6 @@ export default function KaraokeScreen({
             }}
           />
         </div>
-
-        {/* Time label */}
         <span style={{ color: '#94A3B8', fontSize: '13px', flexShrink: 0 }}>
           0:00 / {totalDuration}
         </span>
