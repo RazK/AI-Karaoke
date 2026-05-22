@@ -48,8 +48,8 @@ Set `bustCache: true` when the host taps Regenerate — forces a new Claude call
 2. Load dataset corpus from `data/datasets/<datasetId>.txt`
 3. Build prompt and call Claude API (see Prompt Strategy below)
 4. Validate syllable counts on every returned line:
-   - Off by 1: accept and log
-   - Off by > 1: retry (max 2 retries total)
+   - **Any mismatch** (even 1 syllable off): reject and retry. There is no tolerance.
+   - Validation: `sum(generated[i].syllables) === line.syllableCount` for every line `i`.
 5. After 3 failures: return 500
 6. On success: return the validated lines array
 
@@ -73,10 +73,10 @@ Served as static files — no API route needed.
 
 ### Constraints
 
-1. **Syllable count — hard.** Every line must have exactly the same syllable count as the original.
+1. **Syllable count — absolute hard rule.** `sum(generated[i].syllables)` must equal `syllableCount` for every line, with zero tolerance. If a word from the corpus is too long, split or replace it. Never add or drop words to fix a count — rewrite the whole line instead.
 2. **Words from the corpus.** The dataset text is injected; the model borrows from it rather than inventing freely.
 3. **Structured JSON output.** Free-form text is rejected and triggers a retry.
-4. **Rhyme preservation — soft.** Preserve end-rhymes where possible, never at the cost of syllable count.
+4. **Rhyme preservation — soft.** Preserve end-rhymes where possible, never at the cost of rule 1.
 
 ### Prompt Skeleton
 
@@ -84,11 +84,23 @@ Served as static files — no API route needed.
 You are rewriting the lyrics to "{title}" by {artist} using only words and
 phrases from the provided text corpus.
 
-Rules:
-1. Every line must have EXACTLY the same number of syllables as the original.
+RULES — read all before writing anything:
+1. Every generated line MUST have EXACTLY the same syllable count as the original.
+   Before writing each line: count the original syllables, then verify your
+   generated words sum to the same number. If they don't match, rewrite.
 2. Words must be drawn from the corpus. You may combine or lightly modify them.
-3. Preserve end-rhymes where possible, but never at the cost of rule 1.
-4. Return ONLY a JSON array. No commentary, no markdown.
+3. Preserve end-rhymes where possible, but NEVER at the cost of rule 1.
+4. Return ONLY a JSON array. No commentary, no markdown, no code fences.
+
+SYLLABLE VERIFICATION EXAMPLE:
+  original:  [{"word":"No","syllables":1},{"word":"es-cape","syllables":2},
+               {"word":"from","syllables":1},{"word":"re-al-i-ty","syllables":4}]
+  total = 1+2+1+4 = 8
+  generated MUST also sum to 8 — e.g.:
+  [{"word":"In-sert","syllables":2},{"word":"screw","syllables":1},
+   {"word":"type","syllables":1},{"word":"A","syllables":1},
+   {"word":"care-ful-ly","syllables":3}]  → 2+1+1+1+3 = 8 ✓
+  NOT: add an extra word like "here" that makes the sum 9 ✗
 
 Output format:
 [

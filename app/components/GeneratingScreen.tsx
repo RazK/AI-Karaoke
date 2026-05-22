@@ -15,7 +15,7 @@ const MOCK_LYRICS: LyricLine[] = [
   {
     lineIndex: 0,
     startMs: 0,
-    syllableCount: 6,
+    syllableCount: 5,
     original: [
       { word: 'Is', syllables: 1 },
       { word: 'this', syllables: 1 },
@@ -74,7 +74,7 @@ const MOCK_LYRICS: LyricLine[] = [
   {
     lineIndex: 3,
     startMs: 7630,
-    syllableCount: 7,
+    syllableCount: 8,
     original: [
       { word: 'No', syllables: 1 },
       { word: 'es-', syllables: 1 },
@@ -90,7 +90,6 @@ const MOCK_LYRICS: LyricLine[] = [
       { word: 'screw', syllables: 1 },
       { word: 'type', syllables: 1 },
       { word: 'A', syllables: 1 },
-      { word: 'here', syllables: 1 },
       { word: 'care-ful-ly', syllables: 3 },
     ],
   },
