@@ -5,14 +5,14 @@
 | Field | Value |
 |---|---|
 | Project | AI Karaoke |
-| Owner | Raz Yosigal |
+| Owner | Raz Karl |
 | Type | Hobby / personal project |
 | Hard deadline | Party event (~2 weeks from project start) |
 | Version | 1.0 |
 
 ## Vision
 
-Party karaoke where an AI rewrites the lyrics. Groups pick a song and a ridiculous text source, watch Claude rewrite every line syllable-for-syllable, then try to sing the result to the original melody. Every session is unique. Every song is a disaster. **"The funniest thing you can do with a browser."**
+Party karaoke where an AI rewrites the lyrics. Groups pick a song and a ridiculous text source, watch Claude rewrite every line syllable-for-syllable, then try to sing the result to the original melody. Every session is unique. Every song is a disaster. **A funny, special, memorable night in with your friends.**
 
 ## Goals
 
@@ -24,7 +24,7 @@ Party karaoke where an AI rewrites the lyrics. Groups pick a song and a ridiculo
 
 | Role | Person |
 |---|---|
-| Developer, product owner, primary user | Raz Yosigal |
+| Developer, product owner, primary user | Raz Karl |
 
 ## Success Criteria
 
@@ -45,16 +45,9 @@ The app succeeds at the party if a group of 6–15 people can:
 - Monetization or paid tiers
 - Analytics, observability, or logging dashboards
 - Room cleanup or lifecycle management
-- Audio playback — groups play music on Spotify/YouTube on a separate device
 - Word-level lyric highlight (full-line highlight only)
 - Custom dataset upload
 - User accounts or session history
 - Native iOS/Android apps
 - Localization or non-English songs
 
-## Open Questions
-
-| Question | Impact |
-|---|---|
-| Music playback: should groups play on a separate device, or should the app embed a YouTube player? | UX flow vs. licensing/ToS complexity |
-| Song licensing: is displaying lyrics from well-known songs legally safe for personal party use? | Catalog scope |

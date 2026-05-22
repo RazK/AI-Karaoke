@@ -71,7 +71,7 @@ Use a bold, rounded sans-serif: **Nunito**, **Poppins**, or **Rubik**.
 **Desktop & Mobile (identical layout, vertically stacked):**
 - Full-screen dark background, centered single column
 - Logo / wordmark top-center
-- Tagline: *"The funniest thing you can do with a browser."*
+- Tagline: *"A funny, special, memorable night in with your friends."*
 - Primary CTA (full-width, accent-purple): **Create Room**
 - Divider: "or join a room"
 - Text input for room code (6-char, auto-uppercase) + **Join** button (accent-blue)
