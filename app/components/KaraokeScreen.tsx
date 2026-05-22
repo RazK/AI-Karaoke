@@ -148,20 +148,19 @@ function LyricLineItem({
                 );
               })}
             </div>
-            {/* Original */}
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '4px' }}>
+            {/* Original — flex-centered so it never orphans when syllable counts mismatch */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
               {origRow.map((w, oi) => {
                 const hi = isCurrent && origHi === os + oi;
                 return (
                   <span
                     key={oi}
                     style={{
-                      gridColumn: `span ${w.syllables}`,
                       fontSize: origSz,
                       fontWeight: hi ? 600 : 400,
                       color: hi ? '#FDE68A' : '#94A3B8',
                       textShadow: hi ? '0 0 12px rgba(253,230,138,0.4)' : 'none',
-                      textAlign: 'center', lineHeight: 1.5,
+                      lineHeight: 1.5,
                       transition: 'color 80ms, text-shadow 80ms, font-size 250ms',
                     }}
                   >
@@ -303,16 +302,11 @@ export default function KaraokeScreen({
 
       {/* Content */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex' }}>
-        {/* YouTube placeholder */}
-        <div style={{ position: 'absolute', top: '12px', right: '12px', width: '180px', height: '108px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '13px', zIndex: 2, pointerEvents: 'none' }}>
-          ▶ YouTube
-        </div>
-
         {/* Scrollable lyrics list */}
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          style={{ flex: 1, overflowY: 'auto', padding: '32px 208px 0 24px', display: 'flex', flexDirection: 'column', gap: '6px' }}
+          style={{ flex: 1, overflowY: 'auto', padding: '32px 24px 0', display: 'flex', flexDirection: 'column', gap: '6px' }}
         >
           {display.map((line, i) => (
             <LyricLineItem
