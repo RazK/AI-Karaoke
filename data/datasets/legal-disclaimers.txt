@@ -1,0 +1,77 @@
+TERMS OF SERVICE AND END USER LICENSE AGREEMENT
+LUMINEX SOFTWARE APPLICATION
+Last Updated: January 1, 2024
+Version 3.7.1
+
+PLEASE READ THESE TERMS OF SERVICE ("AGREEMENT") CAREFULLY BEFORE USING THE LUMINEX SOFTWARE APPLICATION ("SERVICE"). BY ACCESSING OR USING THE SERVICE, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO BE BOUND BY THIS AGREEMENT. IF YOU DO NOT AGREE TO THESE TERMS, DO NOT ACCESS OR USE THE SERVICE.
+
+SECTION 1 — DEFINITIONS
+As used in this Agreement, the following terms shall have the meanings set forth herein:
+"User" refers to any individual or entity accessing the Service.
+"Content" means all text, data, software, graphics, photographs, messages, and other materials submitted to or displayed through the Service.
+"Intellectual Property Rights" means all patent rights, copyright rights, mask work rights, moral rights, rights of publicity, trademark, trade dress and service mark rights, goodwill, trade secret rights, and other intellectual property rights as may now exist or hereafter come into existence, and all applications therefore and registrations, renewals, and extensions thereof.
+"Company" means Luminex Technologies, Inc., hereinafter referred to as "the Company," "we," "our," or "us."
+"Applicable Law" means all local, state, national, and international laws, regulations, and conventions.
+
+SECTION 2 — ACCEPTANCE OF TERMS
+Your access to and use of the Service is conditioned upon your acceptance of and compliance with this Agreement. This Agreement applies to all visitors, users, and others who wish to access or use the Service. By accessing or using the Service, you agree to be bound by this Agreement. Notwithstanding the foregoing, if you are entering into this Agreement on behalf of a company or other legal entity, you represent that you have the authority to bind such entity and its affiliates to this Agreement, in which case the terms "User," "you," and "your" shall refer to such entity and its affiliates.
+
+SECTION 3 — CHANGES TO TERMS
+The Company reserves the right, at its sole discretion, to modify or replace this Agreement at any time. If a revision is material, the Company will provide at least thirty (30) days notice prior to any new terms taking effect. What constitutes a material change will be determined at the Company's sole discretion. By continuing to access or use the Service after any revisions become effective, you agree to be bound by the revised terms. If you do not agree to the new terms, you are no longer authorized to use the Service.
+
+SECTION 4 — INTELLECTUAL PROPERTY
+The Service and its original content, features, and functionality are and will remain the exclusive property of the Company and its licensors. The Service is protected by copyright, trademark, and other laws of both the United States and foreign countries. Our trademarks and trade dress may not be used in connection with any product or service without the prior written consent of the Company. You are hereby granted a limited, non-exclusive, non-transferable, non-sublicensable license to access and use the Service solely for your personal, non-commercial purposes. This license is expressly conditioned upon your continued compliance with this Agreement and is hereby revocable at any time.
+
+SECTION 5 — DISCLAIMER OF WARRANTIES
+THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS WITHOUT ANY WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED. TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, THE COMPANY EXPRESSLY DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION, IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. THE COMPANY MAKES NO WARRANTY THAT THE SERVICE WILL MEET YOUR REQUIREMENTS, THE SERVICE WILL BE UNINTERRUPTED, TIMELY, SECURE, OR ERROR-FREE, THE RESULTS THAT MAY BE OBTAINED FROM THE USE OF THE SERVICE WILL BE ACCURATE OR RELIABLE, OR THE QUALITY OF ANY PRODUCTS, SERVICES, INFORMATION, OR OTHER MATERIAL PURCHASED OR OBTAINED BY YOU THROUGH THE SERVICE WILL MEET YOUR EXPECTATIONS.
+
+SECTION 6 — LIMITATION OF LIABILITY
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE COMPANY, ITS AFFILIATES, DIRECTORS, EMPLOYEES, AGENTS, LICENSORS, OR SERVICE PROVIDERS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION, LOSS OF PROFITS, DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, RESULTING FROM: (I) YOUR ACCESS TO OR USE OF OR INABILITY TO ACCESS OR USE THE SERVICE; (II) ANY CONDUCT OR CONTENT OF ANY THIRD PARTY ON THE SERVICE; (III) ANY CONTENT OBTAINED FROM THE SERVICE; AND (IV) UNAUTHORIZED ACCESS, USE, OR ALTERATION OF YOUR TRANSMISSIONS OR CONTENT, WHETHER BASED ON WARRANTY, CONTRACT, TORT (INCLUDING NEGLIGENCE) OR ANY OTHER LEGAL THEORY, WHETHER OR NOT THE COMPANY HAS BEEN INFORMED OF THE POSSIBILITY OF SUCH DAMAGE. IN NO EVENT SHALL THE COMPANY'S AGGREGATE LIABILITY TO YOU FOR ALL CLAIMS RELATING TO THE SERVICE EXCEED THE GREATER OF ONE HUNDRED DOLLARS ($100) OR THE AMOUNTS PAID BY YOU TO THE COMPANY IN THE TWELVE (12) MONTH PERIOD PRIOR TO THE DATE OF THE CLAIM.
+
+SECTION 7 — INDEMNIFICATION
+You agree to defend, indemnify, and hold harmless the Company and its licensee and licensors, and their employees, contractors, agents, officers, and directors from and against any and all claims, damages, obligations, losses, liabilities, costs or debt, and expenses (including but not limited to attorney's fees), resulting from or arising out of: (a) your use and access of the Service, by you or any person using your account and password; (b) a breach of this Agreement; or (c) Content posted on the Service. The indemnified parties include all present and future parent companies, subsidiaries, affiliates, successors, and assigns of the Company.
+
+SECTION 8 — ARBITRATION AND CLASS ACTION WAIVER
+PLEASE READ THIS SECTION CAREFULLY — IT MAY SIGNIFICANTLY AFFECT YOUR LEGAL RIGHTS, INCLUDING YOUR RIGHT TO FILE A LAWSUIT IN COURT.
+
+Any dispute, claim, or controversy arising out of or relating to this Agreement or the breach, termination, enforcement, interpretation, or validity thereof, including the determination of the scope or applicability of this agreement to arbitrate, shall be determined by binding arbitration before one (1) arbitrator. The arbitration shall be administered by JAMS pursuant to its Comprehensive Arbitration Rules and Procedures and in accordance with the Expedited Procedures in those Rules. Judgment on the Award may be entered in any court having jurisdiction. This clause shall not preclude parties from seeking provisional remedies in aid of arbitration from a court of appropriate jurisdiction.
+
+YOU AND THE COMPANY AGREE THAT EACH MAY BRING CLAIMS AGAINST THE OTHER ONLY IN YOUR OR ITS INDIVIDUAL CAPACITY, AND NOT AS A PLAINTIFF OR CLASS MEMBER IN ANY PURPORTED CLASS OR REPRESENTATIVE PROCEEDING. Further, unless both you and the Company agree otherwise, the arbitrator may not consolidate more than one person's claims with your claims, and may not otherwise preside over any form of a representative or class proceeding. THE CLASS ACTION WAIVER IS AN ESSENTIAL PART OF THIS ARBITRATION AGREEMENT AND MAY NOT BE SEVERED FROM IT. If the class action waiver is found to be unenforceable for any reason, the entirety of this arbitration agreement shall be null and void.
+
+SECTION 9 — GOVERNING LAW
+This Agreement shall be governed and construed in accordance with the laws of the State of Delaware, United States, without regard to its conflict of law provisions. Our failure to enforce any right or provision of this Agreement will not be considered a waiver of those rights. If any provision of this Agreement is held to be invalid or unenforceable by a court, the remaining provisions of this Agreement will remain in effect. This Agreement constitutes the entire agreement between us regarding our Service, and supersedes and replaces any prior agreements we might have had between us regarding the Service.
+
+SECTION 10 — TERMINATION
+This Agreement is effective unless and until terminated by either you or the Company. Your rights under this Agreement will terminate automatically without notice from the Company if you fail to comply with any term(s) of this Agreement. Upon termination of this Agreement, you shall cease all use of the Service and delete all copies, full or partial, of the Service in your possession or control. The Company may also terminate or suspend access to our Service immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Agreement. All provisions of this Agreement which by their nature should survive termination shall survive termination, including, without limitation, ownership provisions, warranty disclaimers, indemnity, and limitations of liability.
+
+---
+
+SHOPNOW MARKETPLACE — E-COMMERCE TERMS AND CONDITIONS
+Effective Date: March 15, 2024
+
+These Terms and Conditions ("Terms") govern your use of the ShopNow marketplace platform ("Platform") operated by ShopNow Commerce LLC ("ShopNow," "we," "us," or "our"). By creating an account or placing an order through the Platform, you agree to be bound by these Terms in their entirety.
+
+Section 12(b)(iii): Seller Disputes. Notwithstanding the foregoing, in the event of a dispute between a buyer and a seller arising from a transaction conducted through the Platform, ShopNow shall act solely as an intermediary and shall bear no liability whatsoever for the outcome of such dispute. All representations and warranties made by sellers regarding their products are the sole responsibility of the seller, and ShopNow hereby disclaims any and all liability arising from such representations and warranties. ShopNow is expressly prohibited from being named as a party in any proceeding between buyers and sellers.
+
+Returns and Refunds: All sales are subject to individual seller return policies. ShopNow makes no representations or warranties regarding the return or refund policies of third-party sellers. Pursuant to applicable consumer protection law, buyers in certain jurisdictions may have rights that cannot be waived herein, and nothing in these Terms is intended to limit such rights to the extent such limitation is prohibited by law.
+
+Prohibited Conduct: The following activities are expressly prohibited on the Platform: (i) circumventing or attempting to circumvent Platform security; (ii) using automated tools to scrape, extract, or harvest data from the Platform without the Company's express written consent; (iii) engaging in fraudulent, deceptive, or misleading conduct in connection with any transaction; (iv) reselling Platform services or features; (v) violating any Applicable Law in connection with use of the Platform.
+
+Privacy and Data: By using the Platform, you consent to the collection, use, and disclosure of your personal information as described in the ShopNow Privacy Policy, which is incorporated herein by reference and made a part of these Terms as if fully set forth herein. ShopNow processes personal data pursuant to its legitimate business interests and, where required by Applicable Law, with your explicit consent.
+
+---
+
+STREAMVAULT — STREAMING SERVICE SUBSCRIPTION AGREEMENT
+Version 2.1 | Effective upon account creation
+
+This Subscription Agreement ("Agreement") is entered into by and between StreamVault, Inc. ("StreamVault") and the subscribing user ("Subscriber"). This Agreement governs the Subscriber's access to and use of the StreamVault streaming platform and associated services (collectively, the "Platform").
+
+Subscription Fees: Subscriber agrees to pay the applicable subscription fees as set forth on the StreamVault pricing page at the time of subscription, as may be amended from time to time. Fees are billed in advance on a monthly or annual basis, as selected by the Subscriber. All fees are non-refundable except as may be required by Applicable Law or as expressly provided herein. StreamVault reserves the right to change subscription fees upon thirty (30) days notice to Subscriber.
+
+Content License: StreamVault hereby grants Subscriber a limited, non-exclusive, non-transferable, revocable license to access and stream Content available through the Platform solely for personal, non-commercial use during the term of the subscription. This license is conditioned upon Subscriber's payment of all applicable fees and compliance with this Agreement. This license does not include the right to download, copy, reproduce, distribute, transmit, broadcast, display, sell, license, or otherwise exploit any Content for any purpose without the prior written consent of StreamVault or the applicable rights holder.
+
+Content Availability: The availability of Content on the Platform is subject to change at any time without notice, including as a result of expiration of license agreements with third-party content providers. StreamVault makes no representations or warranties regarding the continued availability of any Content. Subscriber acknowledges and agrees that StreamVault shall not be liable for any failure to provide access to any particular Content. Notwithstanding the foregoing, StreamVault will use commercially reasonable efforts to provide advance notice of the removal of significant Content where practicable.
+
+Within thirty (30) days of account creation, Subscriber may cancel the subscription and receive a pro-rated refund for unused subscription time. After the initial thirty (30) day period, cancellation shall take effect at the end of the then-current billing period and no refunds shall be issued for any portion of the remaining billing period. The class action waiver set forth in Section 8 above applies in full to this Subscription Agreement. Subscriber's sole remedy for any dispute with StreamVault is individual arbitration as described herein.
+
+All Content available through the Platform is protected by copyright, trademark, and other Intellectual Property Rights owned or controlled by StreamVault or the respective content licensors. Subscriber acknowledges and agrees that nothing in this Agreement shall be construed as transferring or granting any Intellectual Property Rights to Subscriber other than the limited license expressly set forth herein.
