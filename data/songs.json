@@ -3,6 +3,7 @@
     "id": "bohemian-rhapsody",
     "title": "Bohemian Rhapsody",
     "artist": "Queen",
+    "youtubeId": "fJ9rUzIMcZQ",
     "durationSeconds": 354,
     "lineCount": 54,
     "free": true
@@ -11,6 +12,7 @@
     "id": "never-gonna-give-you-up",
     "title": "Never Gonna Give You Up",
     "artist": "Rick Astley",
+    "youtubeId": "dQw4w9WgXcQ",
     "durationSeconds": 213,
     "lineCount": 52,
     "free": true
@@ -19,6 +21,7 @@
     "id": "africa",
     "title": "Africa",
     "artist": "Toto",
+    "youtubeId": "FTQbiNvZqaY",
     "durationSeconds": 295,
     "lineCount": 30,
     "free": true
@@ -27,6 +30,7 @@
     "id": "someone-like-you",
     "title": "Someone Like You",
     "artist": "Adele",
+    "youtubeId": "hLQl3WQQoQ0",
     "durationSeconds": 285,
     "lineCount": 39,
     "free": true
@@ -35,6 +39,7 @@
     "id": "dont-stop-believin",
     "title": "Don't Stop Believin'",
     "artist": "Journey",
+    "youtubeId": "1k8craCGpgs",
     "durationSeconds": 251,
     "lineCount": 34,
     "free": true
