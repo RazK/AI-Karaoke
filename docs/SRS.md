@@ -3,261 +3,142 @@
 ## 1. Introduction
 
 ### 1.1 Purpose
-This document defines what AI Karaoke will do — every feature, constraint, and acceptance condition. It is the source of truth for scope decisions.
+Defines what AI Karaoke will do in each version. Source of truth for scope decisions.
 
-### 1.2 Scope
-Web app for same-room groups. One host (laptop/TV), multiple guests (phones). Audio plays via YouTube IFrame on the host screen. Guests join anonymously.
-
-### 1.3 Definitions
+### 1.2 Definitions
 
 | Term | Definition |
 |---|---|
-| Room | A single session identified by a unique 6-character code |
-| Host | The person who created the room, authenticated by PIN |
-| Guest | Any anonymous participant who joined via QR code or room code |
+| Host | The person running the app on the laptop/TV |
 | Song | A track with LRC timing data and syllable-annotated lyrics |
 | Dataset | A text corpus used as source material for AI lyric rewriting |
-| Combo | A paired song + dataset selected by vote |
-| Line | One lyric unit — a generated row stacked above its original row |
-| Syllable grid | CSS layout where each column represents one syllable position |
+| Combo | A paired song + dataset |
+| Line | One lyric unit — generated row stacked above original row |
+| Syllable grid | CSS layout where each column = one syllable position |
 
 ---
 
-## 2. Functional Requirements
+## 2. v1 — Single Device
 
-### FR-1 — Create Room
-The system shall create a room with a unique 6-character alphanumeric code when a host requests it. Room creation must complete in under 2 seconds.
+### 2.1 Scope
+Single-device web app. One host, one screen (laptop or TV). No phones, no joining, no real-time, no database.
 
-### FR-2 — Host Identity
-The device that creates the room is the host. Its guest UUID is stored as `host_guest_id` in the room. Host controls are shown on any client whose localStorage UUID matches `host_guest_id`.
+### 2.2 Functional Requirements
 
-### FR-3 — Join Room
-Guests shall join a room by entering the room code manually or scanning a QR code. Access is instant — any browser, no install, no account.
+#### FR-1 — Song Browser
+The host shall see a searchable catalog of songs displayed as cards. Each card shows title, artist, and duration. The host can type to filter and tap a card to select it.
 
-### FR-4 — QR Code Persistence
-A QR code encoding the join URL shall be visible in the bottom-right corner of every screen after room creation. It is always visible.
+#### FR-2 — Dataset Browser
+The host shall see a searchable catalog of datasets displayed as cards. Each card shows the label and a short description. The host can type to filter and tap a card to select it.
 
-### FR-5 — Guest Count
-A live headcount badge shall display the number of guests currently in the room, updated in real time.
+#### FR-3 — Generate
+With a song and dataset selected, the host taps **Generate**. The system calls the Claude API and rewrites the song's lyrics syllable-for-syllable using the dataset as source material.
 
-### FR-6 — Room State Machine
-Rooms shall transition through states in this order:
-```
-room → voting → generating → karaoke → room → ...
-```
-Every state transition is broadcast to all connected clients, who switch screens on receipt.
+#### FR-4 — Lyrics Cache
+Generated lyrics for a given song × dataset combo are cached in localStorage for the duration of the session. Re-selecting the same combo returns the cached result instantly. The host can force a fresh generation at any time.
 
-### FR-7 — Anonymous Guest Identity
-Guests are identified by a UUID generated client-side on first visit and stored in localStorage. Only data stored: the UUID and vote selections.
+#### FR-5 — Generation Progress
+During generation, a progress screen shows the song × dataset combo name, an animated progress bar, and rotating flavor text. Progress feedback must appear within 1 second of the host tapping Generate.
 
-### FR-8 — Reconnection
-On reconnect, the client shall read the current room state via REST and jump to the correct screen. No re-join prompt, no data loss.
+#### FR-6 — Syllable Constraint (Hard)
+Every generated line must have exactly the same syllable count as the original.
 
-### FR-9 — Vote Feed
-In `room` state, guests shall see a browseable feed of songs and datasets sorted by vote count descending, updated in real time.
+#### FR-7 — Dataset Constraint
+Generated words are drawn from the dataset corpus. The model may combine or lightly modify words.
 
-### FR-10 — Search and Propose
-Guests shall be able to search the catalog. If a result is not yet in the feed, selecting it adds it with 1 vote (the guest's). It appears at the bottom of the feed and rises as others vote for it.
+#### FR-8 — Rhyme Preservation (Soft)
+End-rhymes are preserved where possible, without violating FR-6.
 
-### FR-11 — Upvote Toggle
-Tapping a song card votes for it; tapping again removes the vote. Each guest holds at most 1 song vote and 1 dataset vote at a time. Changing a vote removes the previous one.
+#### FR-9 — Structured Output + Validation
+Claude returns a JSON array of line objects. The server validates syllable counts on every line using the CMU Pronouncing Dictionary (fallback: heuristic splitter).
+- Off by 1 syllable: accept and log
+- Off by > 1 syllable: retry (max 2 retries)
+- After 3 failures: show error, let host retry manually
 
-### FR-12 — Start Voting Round
-The host shall be able to start a 30-second timed voting round, transitioning the room from `room` → `voting` state.
+#### FR-10 — Play
+The host taps **Play**. The YouTube IFrame player starts and `songStartedAt` is recorded simultaneously when YouTube fires `onStateChange(PLAYING)`.
 
-### FR-13 — Voting Screen Display
-During `voting` state:
-- **TV (host screen):** Large numeric countdown center-top + two live leaderboards side by side — Songs (left) and Datasets (right). Each entry shows rank, title, and a vote bar that fills proportionally and reorders in real time as votes come in.
-- **Phones (guests):** Same vote feed and carousels as the between-rounds screen, with a draining full-width progress bar at the top showing time remaining.
+#### FR-11 — Syllable Grid Display
+Lyrics are rendered in a CSS grid where each column = one syllable. Generated line (row 1, large, white) sits directly above original line (row 2, small, gray), syllable-aligned.
 
-### FR-14 — Auto-Select Winner
-When the timer expires, the system shall automatically select the top-voted song and top-voted dataset independently, then transition to `generating` state and trigger AI generation.
+#### FR-12 — Multi-Syllable Word Spanning
+Words with multiple syllables span multiple grid columns (`grid-column: span N`).
 
-### FR-15 — Host Early End
-The host may end the voting round before the timer expires, triggering the same auto-select logic immediately.
+#### FR-13 — Synchronized Line Wrapping
+Both rows always wrap together at the same syllable-column boundary.
 
-### FR-16 — Real-Time Vote Tally
-Vote tallies shall update on all connected clients within 500ms of a vote being cast, without any page refresh.
+#### FR-14 — Line Highlight
+The current active line has an accent-yellow full-line background bar. Previous and next lines are visible at reduced opacity.
 
-### FR-17 — Generate Lyrics
-The system shall call the Claude API to rewrite song lyrics using the selected dataset as source material.
+#### FR-15 — Frame-Accurate Timing
+The host screen uses `player.getCurrentTime() * 1000` in a requestAnimationFrame loop to highlight the correct line in sync with audio playback.
 
-### FR-18 — Syllable Constraint (Hard)
-Every generated line must have exactly the same syllable count as the original line it replaces. This is a hard constraint.
+#### FR-16 — Song Progress Bar
+A full-width progress bar at the bottom shows song progress, driven by `player.getCurrentTime()`, updated every 100ms.
 
-### FR-19 — Dataset Constraint
-Generated words must be drawn from the dataset corpus. The model may combine or lightly modify words but not invent freely.
+#### FR-17 — Song × Dataset Label
+The top bar shows the current song × dataset combo at all times during playback.
 
-### FR-20 — Rhyme Preservation (Soft)
-The system should preserve end-rhymes where possible, but never at the cost of the syllable constraint.
+#### FR-18 — Regenerate
+The host can request a fresh generation at any time, bypassing the cache. Old lyrics stay visible until new ones arrive.
 
-### FR-21 — Structured JSON Output
-The Claude API must return a JSON array of line objects. Free-form text responses are rejected and trigger a retry.
+#### FR-19 — Back to Picker
+After a song or at any point, the host can return to the song/dataset picker to start a new combo.
 
-### FR-22 — Syllable Validation and Retry
-The system shall validate syllable counts on every returned line using the CMU Pronouncing Dictionary (fallback: heuristic splitter).
-- Mismatch of exactly 1 syllable: accept and log
-- Mismatch > 1 syllable: retry the full generation (max 2 retries)
-- After 3 total failures: surface an error message to the host
+### 2.3 Non-Functional Requirements
 
-### FR-23 — Lyric Cache
-Generated lyrics for a given song × dataset combo are cached in the database. Subsequent requests for the same combo return the cached result unless the host forces a refresh.
-
-### FR-24 — Regenerate
-The host may request a fresh generation for the current combo, bypassing the cache. Old lyrics remain visible on all clients until new lyrics arrive.
-
-### FR-25 — Generation Progress Feedback
-During generation, a progress bar and rotating flavor text shall appear on all clients. Progress feedback must appear within 1 second of generation being triggered.
-
-### FR-26 — Syllable Grid Layout
-Lyrics shall be rendered in a CSS grid where each column represents one syllable. The generated line (row 1) sits directly above the original line (row 2), syllable-aligned.
-
-### FR-27 — Multi-Syllable Word Spanning
-Words with multiple syllables span multiple grid columns using `grid-column: span N`.
-
-### FR-28 — Synchronized Line Wrapping
-If a line is too wide for the screen, both rows (generated + original) must wrap at the same syllable-column boundary. Both rows always wrap together at the same syllable-column boundary.
-
-### FR-29 — Line Highlight
-The current active line shall be highlighted with an accent-yellow full-line background bar. Previous and next lines are visible at reduced opacity.
-
-### FR-30 — In-App Audio Playback
-The karaoke screen shall embed a YouTube IFrame player. Each song in the catalog has a `youtubeId`. The player is visible on the host/TV screen. Guest phones show the lyric display.
-
-### FR-31 — Karaoke Timing Sync
-When the host presses "Let's Sing", the YouTube player starts and `songStartedAt` is recorded in the database when YouTube fires `onStateChange(PLAYING)`.
-
-- **Host screen:** uses `player.getCurrentTime() * 1000` in a requestAnimationFrame loop for frame-accurate line highlighting synchronized to actual audio playback.
-- **Guest phones:** use `Date.now() - songStartedAt` in a requestAnimationFrame loop. Expected drift < 500ms on good WiFi, acceptable for reading lyrics.
-
-### FR-32 — Song Progress Bar
-A full-width progress bar fixed at the bottom of the karaoke screen shows song progress, driven by `player.getCurrentTime()` on the host and by `Date.now() - songStartedAt` on guest phones.
-
-### FR-33 — Song × Dataset Label
-The top bar of the karaoke screen shows the current song × dataset combo label at all times during playback.
-
-### FR-34 — Mobile Lyrics View
-Guest phones shall display the same lyric display as the TV (no audio player), synced via the `songStartedAt` timestamp.
-
-### FR-35 — Auto-Switch After Song
-When the song ends, all screens shall automatically transition to the recap screen.
-
-### FR-36 — Connection Status Indicator
-A small colored dot shall indicate real-time connection status on guest phones: green = connected, amber pulsing = reconnecting.
-
-### FR-37 — Recap Screen
-After the song ends, a brief recap screen shows the song × dataset combo just played. The host triggers the return to the vote feed.
-
----
-
-## 3. Non-Functional Requirements
-
-### 3.1 Performance
-
+#### Performance
 | Requirement | Target |
 |---|---|
-| Room creation | < 2 seconds |
-| QR scan → vote feed visible | < 3 seconds |
-| Vote update visible on all clients | < 500ms |
-| Generation progress feedback | < 1 second after host triggers |
-| Total AI generation time | < 10 seconds |
-| Host karaoke sync (audio ↔ lyrics) | Frame-accurate (uses YouTube `getCurrentTime()`) |
-| Guest karaoke sync drift vs. host | < 500ms on good WiFi |
+| Time to first screen | < 2 seconds |
+| Generation progress feedback | < 1 second after Generate is tapped |
+| Total generation time | < 10 seconds |
+| Karaoke sync (lyrics ↔ audio) | Frame-accurate via `getCurrentTime()` |
 
-### 3.2 Reliability
+#### Reliability
+- Good WiFi assumed (Claude API call requires network)
+- localStorage cache survives page refreshes within the same session
 
-- Good WiFi environment is assumed.
-- Votes are persisted to the server immediately on submit.
-- On reconnect, clients restore state from a REST endpoint — guests resume exactly where they left off.
+#### Security
+- `ANTHROPIC_API_KEY` stays server-side in a single Vercel serverless function
+- No user data collected or stored beyond the current session
 
-### 3.3 Security
+### 2.4 User Stories
 
-- Host controls are gated by a 4-digit room PIN (stored server-side, entered once and cached in localStorage).
-- The Claude API key stays server-side; all AI calls go through a server-side API route.
-- Only anonymous data is stored: UUIDs and vote selections.
+#### US-1: Host picks a combo and generates
+**As a host**, I want to quickly find a song and a dataset and generate rewritten lyrics.
 
-### 3.4 Scale (v1 targets)
+- I see searchable card grids for songs and datasets on one screen
+- I type to filter; matching cards appear immediately
+- I tap a song card and a dataset card to select them — both show as selected
+- I tap Generate; the progress screen appears within 1 second
+- Lyrics appear within 10 seconds
 
-- Up to 20 guests per room.
-- Single-room use case (one party at a time).
+#### US-2: Host sings along
+**As a host**, I want to see the lyrics on screen in sync with the music.
 
----
+- Tapping Play starts the YouTube player and the lyric display simultaneously
+- The current line is highlighted in yellow; previous and next lines are visible
+- Generated words (large, white) sit directly above original words (small, gray) in the same syllable column
+- Font is readable from 3 meters on a laptop screen
 
-## 4. User Stories and Acceptance Criteria
+#### US-3: Host regenerates bad lyrics
+**As a host**, I want to get different lyrics if the AI output isn't funny.
 
-### US-1: Host creates a room
-**As a host**, I want to create a room instantly so guests can join with minimal friction.
+- A Regenerate button is always visible during playback
+- Tapping it shows the progress screen; old lyrics stay visible until new ones arrive
+- The new result is different from the cached one
 
-- Clicking "Create Room" creates a room in < 2 seconds
-- A 6-character room code and QR code are shown immediately
-- The host is taken directly to the room screen with host controls visible
+#### US-4: Host picks a new combo
+**As a host**, I want to try a different song or dataset without refreshing the page.
 
-### US-2: Guest joins by scanning QR
-**As a guest**, I want to scan a QR code and be in the session immediately.
+- A "New Combo" button is always visible
+- Tapping it returns to the picker with previous selections cleared
+- Previously generated combos remain in the localStorage cache for the session
 
-- Scanning opens the app in any browser — instant access, works immediately
-- Guest lands directly on the vote feed
-- Guest count badge increments on all screens within 500ms
+### 2.5 v1 Catalog
 
-### US-3: Late arrival joins mid-song
-**As a late guest**, I want to join during an active song and see the right screen.
-
-- Joining mid-song shows the karaoke view synced to the current line (< 100ms drift)
-- Joining between songs shows the vote feed
-- QR code is visible on every screen
-
-### US-4: Guest votes for a song and dataset
-**As a guest**, I want to vote from my phone.
-
-- Guest can search songs and datasets by name
-- Tapping a card votes for it; tapping again removes the vote
-- Only one song vote and one dataset vote per guest at a time
-- Changes are reflected on the TV within 500ms
-
-### US-5: Host starts a voting round
-**As a host**, I want to start a timed round.
-
-- "Start Voting" is visible only to the host
-- Pressing it starts a 30-second countdown
-- TV shows a live leaderboard with vote bars; phones show a draining progress bar
-- When the timer hits zero, the top song and dataset are auto-selected
-
-### US-6: AI generates lyrics
-**As a group**, we want lyrics generated and shown to everyone.
-
-- Generation starts automatically after voting ends
-- All clients see "The AI is cooking…" within 1 second
-- Progress bar animates; flavor text rotates every 2.5 seconds
-- Lyrics appear on all clients when generation is complete
-
-### US-7: Group sings the generated lyrics
-**As a group**, we want to read lyrics that are clearly readable and syllable-aligned.
-
-- Generated words (large, white) sit above original words (small, gray) in the same syllable column
-- Current line has a yellow background bar; previous and next lines are visible at reduced opacity
-- Line transitions are a smooth upward scroll (300ms)
-- Font is readable from 3 meters (min 52px for current generated line on desktop)
-
-### US-8: Host regenerates bad lyrics
-**As a host**, I want to request new lyrics if the AI output is unsatisfying.
-
-- "Regenerate" button is visible to the host at all times during karaoke
-- Tapping it shows the generation screen again; old lyrics stay visible until new ones arrive
-- New generation always bypasses the cache
-
-### US-9: Phone sleeps and reconnects
-**As a guest**, I want my vote preserved and my screen restored after a reconnect.
-
-- Votes are saved to the server immediately on submit
-- On reconnect, the client reads current room state and jumps to the correct screen
-- Guest UUID from localStorage persists — guests resume exactly where they left off
-
----
-
-## 5. Catalog (v1 Seed Data)
-
-### Songs
-
+#### Songs
 | Song | Artist |
 |---|---|
 | Bohemian Rhapsody | Queen |
@@ -266,10 +147,9 @@ After the song ends, a brief recap screen shows the song × dataset combo just p
 | Someone Like You | Adele |
 | Don't Stop Believin' | Journey |
 
-LRC timing files are pre-built as static JSON in `data/lrc/`. Timestamps are approximations; fetch from lrclib.net to improve accuracy.
+LRC timing files are pre-built as static JSON in `data/lrc/`. Fetch from lrclib.net to improve accuracy.
 
-### Datasets
-
+#### Datasets
 | Dataset | Description |
 |---|---|
 | Yelp Reviews (1-star) | Furious customer complaints |
@@ -277,3 +157,36 @@ LRC timing files are pre-built as static JSON in `data/lrc/`. Timestamps are app
 | Legal Disclaimers | Terms of service boilerplate |
 | Horoscopes | Vague cosmic predictions |
 | Craigslist Ads | Chaotic classified listings |
+
+---
+
+## 3. v2 — Phones Join
+
+Guests join from their phones via QR code or room code. No account required. Optional nickname for display purposes only.
+
+### 3.1 New in v2
+- Room creation with a 6-character code + QR code
+- Guests join from their phones — optional nickname at join
+- Live vote feed on phones: songs and datasets displayed as carousels, sorted by vote count
+- 30-second timed voting round started by the host
+- TV shows live leaderboard during voting; phones show draining progress bar
+- Top-voted song × top-voted dataset (independently) auto-selected when timer ends
+- Guest phones show companion lyric view synced to the TV via `songStartedAt` timestamp
+- Guest count badge on all host screens
+- Reconnection: clients restore state on reconnect, resume where they left off
+
+### 3.2 v2 Architecture Additions
+- Supabase (real-time + DB): rooms table, votes tables, replaces localStorage
+- Supabase Realtime: state transitions broadcast to all clients
+- Guest UUID in localStorage as anonymous identity
+
+---
+
+## 4. v3 — History + Ratings
+
+### 4.1 New in v3
+- After each song, all guests rate the combo 1–5 stars
+- Ratings are averaged and stored per combo per device
+- Host sees a "Greatest Hits" catalog: all combos played on this device, sorted by average rating
+- Host can replay any past combo (uses cached lyrics)
+- Combos catalog is per-device (localStorage or local DB) — no accounts needed

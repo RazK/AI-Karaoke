@@ -8,46 +8,43 @@
 | Owner | Raz Karl |
 | Type | Hobby / personal project |
 | Hard deadline | Party event (~2 weeks from project start) |
-| Version | 1.0 |
 
 ## Vision
 
-Party karaoke where an AI rewrites the lyrics. Groups pick a song and a ridiculous text source, watch Claude rewrite every line syllable-for-syllable, then try to sing the result to the original melody. Every session is unique. Every song is a disaster. **A funny, special, memorable night in with your friends.**
+*"The AI rewrote your songs. You still have to sing them."*
+
+Party karaoke where Claude rewrites every lyric line syllable-for-syllable using an absurd text source — IKEA manuals, Yelp reviews, legal disclaimers. The melody stays. The words become chaos. A funny, special, memorable night in with your friends.
 
 ## Goals
 
-1. A working, usable app at a party of 6–15 people within 2 weeks
-2. Full voting + karaoke loop end-to-end: join → vote → generate → sing
-3. Zero friction to join — scan a QR code, no name, no account, no install
-
-## Stakeholders
-
-| Role | Person |
-|---|---|
-| Developer, product owner, primary user | Raz Karl |
-
-## Success Criteria
-
-The app succeeds at the party if a group of 6–15 people can:
-
-1. Join a room by scanning a QR code with no friction
-2. Vote for a song and dataset from their phones
-3. Watch AI-generated lyrics appear on the host screen
-4. Sing along — and find it funny
+1. Working app at a party within 2 weeks
+2. Host picks a song + dataset, generates rewritten lyrics, and sings along — all from one device
+3. The generated lyrics are actually singable (syllable-accurate) and actually funny
 
 ## Target Users
 
-- **Primary:** Friend groups (4–15 people) in the same physical space — house parties, game nights, birthday parties. One laptop or TV, everyone else on their phone.
-- **Not in v1:** Remote groups, solo users, large venues.
+Friend groups (4–15 people) in the same physical space. One host laptop or TV. Everyone watches and sings together.
 
-## Out of Scope (v1)
+## Versions
 
-- Monetization or paid tiers
-- Analytics, observability, or logging dashboards
-- Room cleanup or lifecycle management
-- Word-level lyric highlight (full-line highlight only)
-- Custom dataset upload
-- User accounts or session history
-- Native iOS/Android apps
-- Localization or non-English songs
+### v1 — Single Device (current)
+Host-only. Everything runs on one laptop or TV. No phones, no joining, no real-time. Pick → Generate → Sing.
 
+### v2 — Phones Join
+Guests join from their phones via QR code or room code. Optional nicknames. Live voting on song + dataset combos from the feed. Companion lyric view on phones.
+
+### v3 — History + Ratings
+Saved combo history per device. After each song, guests rate the combo 1–5 stars. Host browses a "Greatest Hits" catalog of past combos and can replay favorites.
+
+## v1 Success Criteria
+
+A group of people can gather around a laptop, pick a song and a dataset, watch Claude generate the rewritten lyrics, and sing along to the music — and find it funny.
+
+## v1 Out of Scope
+
+- Guest phones or any multi-device experience
+- Room codes, QR codes, joining mechanics
+- Real-time sync or database
+- Voting system
+- Saved history or ratings
+- User accounts or nicknames

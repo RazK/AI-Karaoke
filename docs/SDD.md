@@ -2,307 +2,197 @@
 
 ## 1. System Overview
 
-AI Karaoke is a web app where one host (laptop/TV) creates a room and up to 20 guests join via phone. Guests vote on a song + dataset combo; the app calls Claude to rewrite the lyrics syllable-for-syllable; the group sings along to the song playing inside the app on the host screen.
-
-A web app — runs in any browser. Music plays via an embedded YouTube player on the host/TV screen.
+AI Karaoke v1 is a single-device web app. The host opens it on a laptop or TV, picks a song and dataset, generates AI-rewritten lyrics via Claude, and sings along to the YouTube player. No backend database, no real-time sync, no guest devices.
 
 ---
 
 ## 2. Architecture
 
-### 2.1 High-Level Diagram
+### 2.1 Diagram
 
 ```
-Phones (guests)              Laptop / TV (host)
-     │                              │
-     └──────────┬───────────────────┘
-                │ HTTPS + Supabase Realtime
-                ▼
-         ┌─────────────────┐
-         │  Next.js App    │  ← hosted on Vercel (serverless)
-         │  (App Router)   │
-         └────────┬────────┘
-                  │
-       ┌──────────┴──────────┐
-       │                     │
-  ┌────▼────┐         ┌──────▼──────┐
-  │Supabase │         │  Claude API │
-  │DB + RT  │         │ (/api/gen.) │
-  └─────────┘         └─────────────┘
+Browser (host laptop / TV)
+        │
+        │ HTTPS
+        ▼
+  ┌─────────────┐       ┌──────────────┐
+  │  Next.js    │──────▶│  Claude API  │
+  │  (Vercel)   │       │  (via /api/  │
+  │             │       │   generate)  │
+  └──────┬──────┘       └──────────────┘
+         │
+    ┌────┴────────────────┐
+    │                     │
+YouTube IFrame         localStorage
+(audio + sync)        (lyrics cache)
 ```
 
 ### 2.2 Component Responsibilities
 
 | Component | Responsibility |
 |---|---|
-| **Next.js (App Router)** | All UI screens, server components, API routes |
-| **Supabase** | Persistent state (rooms, votes, lyrics), real-time subscriptions |
-| **`/api/generate` route** | Server-side Claude API proxy — `ANTHROPIC_API_KEY` stays on the server |
-| **YouTube IFrame API** | In-app music playback on the host/TV screen |
-| **LRCLib** | Free per-line LRC timing data for karaoke sync |
-| **Vercel** | Hosting, serverless function execution, auto-deploy from `main` |
+| **Next.js (App Router)** | All UI screens and the `/api/generate` route |
+| **`/api/generate` route** | Vercel serverless function — Claude API proxy; `ANTHROPIC_API_KEY` stays server-side |
+| **YouTube IFrame API** | Audio playback; `getCurrentTime()` drives karaoke sync |
+| **LRCLib + `lrc-kit`** | Per-line LRC timing data parsed from static JSON files |
+| **localStorage** | Lyrics cache for the current session |
 
 ### 2.3 Technology Stack
 
 | Layer | Choice | Rationale |
 |---|---|---|
-| Frontend | Next.js 14+ (App Router) | Server components, file-based routing, Vercel-native |
+| Frontend | Next.js 14+ (App Router) | File-based routing, server components, Vercel-native |
 | Styling | Tailwind CSS | Utility-first, fast iteration |
-| Real-time | Supabase Realtime | Replaces Socket.io + Redis; single managed service |
-| Database | Supabase (PostgreSQL) | Same service as real-time; free tier sufficient for v1 |
 | AI | Claude API (`claude-sonnet-4`) | Best instruction-following for structured JSON output |
 | Audio | YouTube IFrame API | Free; YouTube handles licensing and delivery |
-| Lyric timing | LRCLib + `lrc-kit` (npm) | Free, keyless, 3M+ songs, millisecond-accurate line timestamps |
-| Deployment | Vercel | Zero-ops, auto-deploys `main`, PR preview URLs |
+| Lyric timing | LRCLib + `lrc-kit` | Free, keyless, 3M+ songs, millisecond-accurate line timestamps |
+| Hosting | Vercel | Zero-ops, auto-deploys `main`, PR preview URLs |
+| State | React + localStorage | Session-scoped lyrics cache; no database needed in v1 |
 
 ### 2.4 Key Architectural Decisions
 
-**Supabase for real-time and persistence.**
-Supabase handles subscriptions and state in a single managed service — zero infrastructure to operate.
+**Single serverless route for Claude.**
+All app state lives in the browser. The only server-side code is `/api/generate` — a thin proxy that holds the `ANTHROPIC_API_KEY` and calls Claude. Everything else (song catalog, LRC timing, cached lyrics) is client-side.
 
-**Client-side timing loop.**
-The host presses "Let's Sing", which simultaneously starts the YouTube player and records `songStartedAt` in the database. Every client independently computes the current lyric line using `lrc.findLineAt(Date.now() - songStartedAt)` in a `requestAnimationFrame` loop. Latency differences between clients cause < 100ms drift, which is imperceptible.
+**localStorage lyrics cache.**
+Generated lyrics for a song × dataset combo are cached in localStorage under the key `lyrics_<songId>_<datasetId>`. The same combo within a session returns instantly. Bust the cache by passing `bustCache: true` to `/api/generate`.
 
-**Claude API proxied through a serverless route.**
-`ANTHROPIC_API_KEY` lives only in Vercel environment variables. The client never calls Claude directly. `/api/generate` is the only entry point to the AI.
+**Frame-accurate sync via `getCurrentTime()`.**
+When the host taps Play, the YouTube player starts and `songStartedAt = Date.now()` is recorded in React state. The karaoke RAF loop uses `player.getCurrentTime() * 1000` — the player's own clock — for frame-accurate line highlighting. This is drift-free regardless of buffering or network latency.
 
-**Host identity via UUID.**
-The device that creates the room is the host. Its guest UUID is stored as `host_guest_id`. All clients fetch the room's `host_guest_id` on join; any client whose localStorage UUID matches it renders host controls. No separate auth step needed.
-
-**Anonymous guests.**
-Each guest gets a UUID on first visit, stored in localStorage. This UUID is their identity for vote deduplication and reconnection.
-
-**YouTube IFrame for audio.**
-Each song in the catalog has a `youtubeId` in `songs.json`. The karaoke screen embeds a YouTube player using the IFrame API. The host's "Let's Sing" button calls `player.playVideo()` and records `songStartedAt` simultaneously. YouTube handles all audio licensing via their platform terms.
+**Static catalog data.**
+Songs and datasets are static JSON files bundled with the app. No database reads needed to browse the catalog.
 
 ---
 
-## 3. Data Design
+## 3. Data
 
-### 3.1 Supabase Tables
-
-**`rooms`**
-```sql
-CREATE TABLE rooms (
-  code            CHAR(6)     PRIMARY KEY,
-  state           TEXT        NOT NULL DEFAULT 'room',
-  -- state values: 'room' | 'voting' | 'generating' | 'karaoke'
-  host_guest_id   UUID        NOT NULL,
-  song_id         TEXT,
-  dataset_id      TEXT,
-  song_started_at BIGINT,     -- Unix ms; set when host starts karaoke
-  voting_ends_at  BIGINT,     -- Unix ms; set when voting round starts
-  guest_count     INT         NOT NULL DEFAULT 0
-);
-```
-
-**`votes_songs`**
-```sql
-CREATE TABLE votes_songs (
-  room_code  TEXT  NOT NULL REFERENCES rooms(code) ON DELETE CASCADE,
-  guest_id   UUID  NOT NULL,
-  song_id    TEXT  NOT NULL,
-  PRIMARY KEY (room_code, guest_id)  -- enforces one song vote per guest per room
-);
-```
-
-**`votes_datasets`**
-```sql
-CREATE TABLE votes_datasets (
-  room_code   TEXT  NOT NULL REFERENCES rooms(code) ON DELETE CASCADE,
-  guest_id    UUID  NOT NULL,
-  dataset_id  TEXT  NOT NULL,
-  PRIMARY KEY (room_code, guest_id)  -- enforces one dataset vote per guest per room
-);
-```
-
-**`lyrics`**
-```sql
-CREATE TABLE lyrics (
-  song_id     TEXT        NOT NULL,
-  dataset_id  TEXT        NOT NULL,
-  lines       JSONB       NOT NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (song_id, dataset_id)
-);
-```
-
-### 3.2 Real-Time Subscriptions
-
-Supabase Realtime is enabled on:
-- `rooms` — all clients subscribe to their room row; column changes drive screen transitions
-- `votes_songs` — clients subscribe to their room's vote rows for live tally updates
-- `votes_datasets` — same pattern
-
-### 3.3 Row-Level Security
-
-| Table | Read | Write |
-|---|---|---|
-| `rooms` | All clients (their room row) | Server-side API routes only |
-| `votes_songs` | All clients (their room's rows) | Guest may write/delete only rows where `guest_id` matches their own |
-| `votes_datasets` | Same | Same |
-| `lyrics` | All clients | `/api/generate` route only |
-
-### 3.4 Static Catalog Data
-
-Catalog data is static JSON files served at build time.
+### 3.1 Static Catalog Files
 
 ```
-data/songs.json         — [{ id, title, artist, youtubeId, durationSeconds, lineCount }]
-data/datasets.json      — [{ id, label, description }]
-data/lrc/<id>.json      — { lines: [{ startMs, text, syllables: [{ word, count }] }] }
+data/songs.json      — [{ id, title, artist, youtubeId, durationSeconds, lineCount }]
+data/datasets.json   — [{ id, label, description }]
+data/lrc/<id>.json   — { lines: [{ startMs, text, syllables: [{ word, count }] }] }
 ```
 
-`youtubeId` is the 11-character YouTube video ID (e.g. `"dQw4w9WgXcQ"`). The karaoke screen uses this to load the YouTube IFrame player.
+`youtubeId` is the 11-character YouTube video ID. The karaoke screen loads the player with this ID.
+
+### 3.2 localStorage Schema
+
+```
+lyrics_<songId>_<datasetId>  →  JSON string of the lines array (same shape as /api/generate response)
+```
+
+Cleared only when the browser storage is cleared. Survives page refreshes within a session.
 
 ---
 
 ## 4. Component Design
 
-### 4.1 Room State Machine
+### 4.1 App Flow
 
 ```
-room → voting → generating → karaoke → room → ...
+Picker screen
+  └─ Host selects song card + dataset card
+  └─ Host taps Generate
+        └─ Check localStorage cache
+              ├─ Cache hit → skip to Karaoke screen
+              └─ Cache miss → call /api/generate
+                    └─ Progress screen (spinner + flavor text)
+                    └─ On success → Karaoke screen
+                    └─ On failure → error toast, stay on Picker
+
+Karaoke screen
+  └─ Host taps Play
+        └─ player.playVideo()
+        └─ YouTube fires onStateChange(PLAYING)
+        └─ songStartedAt = Date.now()
+        └─ RAF loop starts: currentLine = lrc.findLineAt(player.getCurrentTime() * 1000)
+  └─ Host taps Regenerate → back to Progress screen (bustCache: true)
+  └─ Host taps New Combo → back to Picker screen
 ```
 
-| State | Who transitions | How |
-|---|---|---|
-| `room` → `voting` | Host ("Start Voting") | `POST /api/rooms/:code/start-voting` |
-| `voting` → `generating` | Auto (timer expires) or Host ("End Early") | Server sets state + triggers `/api/generate` |
-| `generating` → `karaoke` | Auto (generation complete) | `/api/generate` updates `rooms.state` |
-| `karaoke` → `room` | Host ("Next Song") | `POST /api/rooms/:code/end-song` |
-
-All state changes update `rooms.state` in Supabase. Realtime fires to all subscribers, who switch screens on receipt.
-
-### 4.2 Voting Logic
-
-- Primary key on `votes_songs` and `votes_datasets` enforces one vote per guest per room
-- Upsert on vote; delete on toggle-off
-- Winner query (run when timer expires or host ends early):
-  ```sql
-  SELECT song_id FROM votes_songs
-  WHERE room_code = $1
-  GROUP BY song_id ORDER BY COUNT(*) DESC LIMIT 1;
-
-  SELECT dataset_id FROM votes_datasets
-  WHERE room_code = $1
-  GROUP BY dataset_id ORDER BY COUNT(*) DESC LIMIT 1;
-  ```
-- Song and dataset winners are selected independently
-
-### 4.3 Lyric Generation Pipeline
+### 4.2 Lyric Generation
 
 ```
-1. Receive { songId, datasetId, bustCache } from host request
-2. Check lyrics table for (songId, datasetId) — return cached if bustCache=false
-3. Load syllable-annotated lyrics from data/lrc/<songId>.json
-4. Load dataset corpus from data/datasets/<datasetId>.txt
-5. Build prompt (see API.md for prompt skeleton)
-6. Call Claude API, expect JSON array response
-7. Validate each line: syllable count must match original (accept ±1, log; reject >±1)
-8. On rejection: retry (max 2 retries total)
-9. After 3 failures: return error — host sees error, can retry manually
-10. Upsert result to lyrics table
-11. Update rooms.state = 'karaoke' → Supabase Realtime fires to all clients
+POST /api/generate receives { songId, datasetId, bustCache }
+  1. Load syllable-annotated lyrics from data/lrc/<songId>.json
+  2. Load dataset corpus text
+  3. Build prompt (see API.md)
+  4. Call Claude API, expect JSON array
+  5. Validate each line's syllable count
+     - Off by 1: accept, log
+     - Off by > 1: retry (max 2 retries)
+     - 3 failures: return 500 with error message
+  6. Return validated lines array
 ```
 
-### 4.4 Karaoke Timing
+Client receives the lines array, writes it to localStorage, and navigates to the Karaoke screen.
 
-Sync is achieved differently for the host (TV) and guests (phones), because only the host screen has the YouTube player.
+### 4.3 Karaoke Timing
 
-**Host screen (source of truth):**
-```
-Host presses "Let's Sing"
-  → player.playVideo() called
-  → YouTube fires onStateChange(YT.PlayerState.PLAYING)
-  → At that exact moment: POST /api/rooms/:code/start-song
-      body: { songStartedAt: Date.now() }
-  → Server stores song_started_at; Supabase Realtime fires to all clients
-  → Host RAF loop:
-      positionMs = player.getCurrentTime() * 1000  ← YouTube's own clock
-      currentLine = lrc.findLineAt(positionMs)
+```javascript
+// Called on every animation frame during playback
+function onFrame() {
+  const positionMs = player.getCurrentTime() * 1000
+  const line = lrc.findLineAt(positionMs)
+  setCurrentLineIndex(line.index)
+  if (positionMs >= song.durationMs) endSong()
+  requestAnimationFrame(onFrame)
+}
 ```
 
-Using `player.getCurrentTime()` directly means the host display is frame-accurate regardless of buffering, seek, or ads. It does not drift.
+`player.getCurrentTime()` is YouTube's own playback clock — it accounts for buffering, seeks, and any latency. The display is always in sync with what the host hears.
 
-**Guest phones (followers):**
-```
-Receive songStartedAt from Supabase Realtime
-  → Start RAF loop:
-      positionMs = Date.now() - songStartedAt
-      currentLine = lrc.findLineAt(positionMs)
-```
+### 4.4 Syllable Grid
 
-Guest sync is approximate (typically < 500ms off on good WiFi). This is acceptable — guests are reading along on their phones, not controlling playback.
+Each lyric line renders as a CSS grid:
 
-**Why two approaches:** Only the host screen runs the YouTube player and can call `getCurrentTime()`. Guest phones use the broadcast `songStartedAt` timestamp — lightweight and accurate enough for reading lyrics.
-
-### 4.5 Host Identity Flow
-
-```
-1. POST /api/rooms  →  client sends { hostGuestId: uuid }
-2. Server stores hostGuestId in rooms.host_guest_id
-3. Response: { roomCode }
-4. All clients fetch host_guest_id when joining
-5. Host-only API calls send { guestId } — server checks guestId === host_guest_id
-6. Host controls render on the device whose localStorage UUID matches host_guest_id
+```css
+grid-template-columns: repeat(N, 1fr)  /* N = total syllable count */
 ```
 
-### 4.6 YouTube Integration
+Each word's `grid-column` is `startSyllable / span syllableCount`. Both rows (generated on top, original below) share the same grid, so syllables align vertically.
 
-- Each song in `songs.json` has a `youtubeId` field
-- On the karaoke screen, the host view renders a YouTube IFrame player — kept visible at all times per YouTube ToS
-- `player.playVideo()` is called when host presses "Let's Sing"; `player.stopVideo()` on song end
-- Guest phone views show the lyric display only
+If the grid is too wide for the screen, both rows split at the same syllable-column boundary — they always wrap together.
 
 ---
 
-## 5. Screen Summary
+## 5. Deployment
 
-Full screen specifications are in `docs/UX.md`. Summary:
-
-| Screen | State | Who sees what |
-|---|---|---|
-| 1. Landing | — | Create Room / Join Room |
-| 2. Room (between rounds) | `room` | Vote feed, search, carousels; host sees "Start Voting" |
-| 3. Voting Round | `voting` | TV: live leaderboard + timer; Phone: carousels + draining bar |
-| 4. Generating | `generating` | Progress bar + flavor text on all screens |
-| 5. Karaoke | `karaoke` | TV: YouTube player + lyrics; Phone: lyrics only |
-| 6. Recap | post-`karaoke` | Song × dataset summary; host triggers next round |
-
----
-
-## 6. Deployment
-
-### 6.1 Vercel
+### 5.1 Vercel
 
 - Auto-deploys on push to `main`
-- PR branches get preview URLs for testing
-- All API routes run as Vercel serverless functions
+- PR branches get preview URLs
+- Only `/api/generate` runs as a serverless function; everything else is static
 
-### 6.2 Environment Variables
-
-Set in Vercel dashboard and in local `.env.local`:
+### 5.2 Environment Variables
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=        # Supabase project URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Supabase anon/publishable key
-ANTHROPIC_API_KEY=               # Claude API key — server only, never NEXT_PUBLIC_
+ANTHROPIC_API_KEY=    # Server-side only — never exposed to the browser
 ```
 
-### 6.3 Supabase Setup Steps
+No other environment variables needed in v1.
 
-1. Create a project at supabase.com (free tier)
-2. Run SQL migrations from `supabase/migrations/`
-3. Enable Realtime on `rooms`, `votes_songs`, `votes_datasets` in the Supabase dashboard
-4. Copy the project URL and anon key to environment variables
-
-### 6.4 Key npm Packages
+### 5.3 npm Packages
 
 | Package | Purpose |
 |---|---|
-| `@supabase/supabase-js` | Supabase client |
-| `@supabase/ssr` | Server-side Supabase helpers for Next.js |
+| `@anthropic-ai/sdk` | Claude API client (server-side only) |
 | `lrc-kit` | Parse LRC timing data |
 | `tailwindcss` | Styling |
-| `@anthropic-ai/sdk` | Claude API SDK |
+
+---
+
+## 6. v2 Architecture Additions
+
+When phones join in v2, the following are added:
+
+- **Supabase** — real-time DB replaces localStorage for shared state (rooms, votes, lyrics cache)
+- **Room system** — 6-character room code, QR code, guest join flow
+- **Supabase Realtime** — state transitions broadcast to all clients (TV + phones)
+- **Guest identity** — UUID in localStorage; optional nickname at join
+- **Voting** — `votes_songs` and `votes_datasets` tables; 30-second timed rounds
+- **Companion view** — guest phones show lyrics synced via `Date.now() - songStartedAt`
+
+The v1 `/api/generate` route carries forward unchanged into v2.

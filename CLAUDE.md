@@ -2,19 +2,17 @@
 
 # AI Karaoke — Claude Context
 
-Party karaoke web app. Read `docs/SDD.md` for architecture, `docs/API.md` for endpoints, `docs/UX.md` for screens. `docs/SRS.md` is scope; `docs/CHARTER.md` is goals.
+Party karaoke app. Read `docs/SDD.md` for architecture, `docs/API.md` for endpoints, `docs/UX.md` for screens. `docs/SRS.md` is scope; `docs/CHARTER.md` is goals.
 
-## Architecture (locked — do not re-discuss)
+## v1 Architecture (locked — do not re-discuss)
 
 - **Frontend:** Next.js (App Router) on Vercel
-- **Real-time + DB:** Supabase — single managed service for real-time subscriptions and DB
-- **AI:** Vercel serverless function at `app/api/generate/route.ts` — proxies Claude API; key stays server-side
-- **Audio:** YouTube IFrame API — embedded on the host/TV karaoke screen; each song has a `youtubeId` in `songs.json`
-- **Timing — host:** `player.getCurrentTime() * 1000` in a RAF loop → frame-accurate sync to audio
-- **Timing — guests:** `Date.now() - songStartedAt` in a RAF loop → < 500ms drift, acceptable for reading lyrics
-- **Host auth:** `host_guest_id` stored in `rooms`; host controls render on the client whose localStorage UUID matches it
-- **Guests:** Anonymous. UUID in `localStorage` is the only identity.
-- **Voting:** Feed-based upvote (search → propose → upvote). Host starts a 30s timed round. Winning combo = top-voted song × top-voted dataset independently.
+- **Backend:** Single Vercel serverless function at `app/api/generate/route.ts` — Claude API proxy; key stays server-side
+- **Audio:** YouTube IFrame API — embedded on the karaoke screen; each song has a `youtubeId` in `songs.json`
+- **Timing:** `player.getCurrentTime() * 1000` in a RAF loop — frame-accurate sync to audio playback
+- **State:** React state only — no database, no real-time
+- **Cache:** Generated lyrics stored in localStorage under `lyrics_<songId>_<datasetId>`
+- **Catalog:** Static JSON files (`data/songs.json`, `data/datasets.json`, `data/lrc/*.json`)
 - **Word-level highlight:** v1 highlights the full active line. Word-level is a future enhancement.
 - **Deployment:** Vercel auto-deploys `main`. PR preview URLs for testing.
 
@@ -26,30 +24,21 @@ Party karaoke web app. Read `docs/SDD.md` for architecture, `docs/API.md` for en
 
 ## Build phases (in order)
 
-### Phase 1 — `feat/supabase-schema`
-SQL migrations for the 4 tables in `docs/SDD.md § 3.1`. Enable Realtime on `rooms`, `votes_songs`, `votes_datasets`. Apply RLS policies.
+### Phase 1 — `feat/nextjs-scaffold`
+Initialize Next.js App Router project. Install: `lrc-kit`, `tailwindcss`, `@anthropic-ai/sdk`. Build 3 screens per `docs/UX.md`: Picker, Generating, Karaoke.
 
-### Phase 2 — `feat/nextjs-scaffold`
-Initialize Next.js App Router project. Install: `@supabase/supabase-js`, `@supabase/ssr`, `lrc-kit`, `tailwindcss`, `@anthropic-ai/sdk`. Build all 6 screens per `docs/UX.md`.
+### Phase 2 — `feat/generate-api`
+Serverless function at `app/api/generate/route.ts`. Full spec in `docs/API.md`.
 
-### Phase 3 — `feat/generate-api`
-Serverless function at `app/api/generate/route.ts`. Full spec in `docs/API.md` (Generate endpoint + Claude Prompt Strategy).
-
-### Phase 4 — `feat/karaoke-sync`
-YouTube IFrame integration + RAF timing loop. Host screen uses `player.getCurrentTime()`; guest screens use `songStartedAt` timestamp. Full spec in `docs/SDD.md § 4.4`.
+### Phase 3 — `feat/karaoke-sync`
+YouTube IFrame integration + RAF timing loop. Spec in `docs/SDD.md § 4.3`.
 
 ## Environment variables
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-ANTHROPIC_API_KEY=
+ANTHROPIC_API_KEY=    # Server-side only
 ```
 
-## Supabase client helpers (to create in Phase 2)
+## v2 additions (for reference)
 
-```
-utils/supabase/client.ts     — browser client (createBrowserClient)
-utils/supabase/server.ts     — server component client (createServerClient)
-utils/supabase/middleware.ts — middleware session refresh
-```
+When phones join: add Supabase (real-time + DB), room system, guest identity (UUID + optional nickname), voting, companion lyric view on phones. The `/api/generate` route carries forward unchanged. Full v2 spec in `docs/SRS.md § 3` and `docs/SDD.md § 6`.
