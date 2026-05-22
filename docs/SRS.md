@@ -68,7 +68,7 @@ Words with multiple syllables span multiple grid columns (`grid-column: span N`)
 Both rows always wrap together at the same syllable-column boundary.
 
 #### FR-14 — Line Highlight
-The current active line has an accent-yellow full-line background bar. Previous and next lines are visible at reduced opacity.
+The current active line is highlighted with a full-width violet glow bar behind both rows. Previous and next lines are visible at reduced opacity. The glow fades in over 150ms when a line becomes active.
 
 #### FR-15 — Frame-Accurate Timing
 The host screen uses `player.getCurrentTime() * 1000` in a requestAnimationFrame loop to highlight the correct line in sync with audio playback.
