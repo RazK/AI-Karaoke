@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-base: #09090B;
+  --color-card: rgba(255, 255, 255, 0.05);
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-accent-violet: #7C3AED;
+  --color-accent-cyan: #06B6D4;
+  --color-text-primary: #F8FAFC;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #3F3F46;
+  --color-success: #10B981;
+}
+
+body {
+  background-color: #09090B;
+  color: #F8FAFC;
+  font-family: 'Inter', sans-serif;
+  height: 100svh;
+  overflow: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(124, 58, 237, 0.15), transparent);
+  pointer-events: none;
+  z-index: 0;
+}
