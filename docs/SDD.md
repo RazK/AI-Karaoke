@@ -4,7 +4,7 @@
 
 AI Karaoke is a web app where one host (laptop/TV) creates a room and up to 20 guests join via phone. Guests vote on a song + dataset combo; the app calls Claude to rewrite the lyrics syllable-for-syllable; the group sings along to the song playing inside the app on the host screen.
 
-No native app. No separate audio device needed — music plays via an embedded YouTube player on the karaoke screen.
+A web app — runs in any browser. Music plays via an embedded YouTube player on the host/TV screen.
 
 ---
 
@@ -37,7 +37,7 @@ Phones (guests)              Laptop / TV (host)
 |---|---|
 | **Next.js (App Router)** | All UI screens, server components, API routes |
 | **Supabase** | Persistent state (rooms, votes, lyrics), real-time subscriptions |
-| **`/api/generate` route** | Server-side Claude API proxy — key never reaches the client |
+| **`/api/generate` route** | Server-side Claude API proxy — `ANTHROPIC_API_KEY` stays on the server |
 | **YouTube IFrame API** | In-app music playback on the host/TV screen |
 | **LRCLib** | Free per-line LRC timing data for karaoke sync |
 | **Vercel** | Hosting, serverless function execution, auto-deploy from `main` |
@@ -51,26 +51,26 @@ Phones (guests)              Laptop / TV (host)
 | Real-time | Supabase Realtime | Replaces Socket.io + Redis; single managed service |
 | Database | Supabase (PostgreSQL) | Same service as real-time; free tier sufficient for v1 |
 | AI | Claude API (`claude-sonnet-4`) | Best instruction-following for structured JSON output |
-| Audio | YouTube IFrame API | Free, no licensing burden, no audio file storage needed |
-| Lyric timing | LRCLib + `lrc-kit` (npm) | Free, no API key, 3M+ songs, millisecond-accurate line timestamps |
+| Audio | YouTube IFrame API | Free; YouTube handles licensing and delivery |
+| Lyric timing | LRCLib + `lrc-kit` (npm) | Free, keyless, 3M+ songs, millisecond-accurate line timestamps |
 | Deployment | Vercel | Zero-ops, auto-deploys `main`, PR preview URLs |
 
 ### 2.4 Key Architectural Decisions
 
-**No Redis, no Socket.io, no separate Express server.**
-Supabase handles real-time subscriptions and persistent state. This eliminates all infrastructure management — no servers, no queues, no pub/sub setup.
+**Supabase for real-time and persistence.**
+Supabase handles subscriptions and state in a single managed service — zero infrastructure to operate.
 
 **Client-side timing loop.**
-The host presses "Let's Sing", which simultaneously starts the YouTube player and records `songStartedAt` in the database. Every client independently computes the current lyric line using `lrc.findLineAt(Date.now() - songStartedAt)` in a `requestAnimationFrame` loop. No server clock. No per-line events. Latency differences between clients cause < 100ms drift, which is imperceptible.
+The host presses "Let's Sing", which simultaneously starts the YouTube player and records `songStartedAt` in the database. Every client independently computes the current lyric line using `lrc.findLineAt(Date.now() - songStartedAt)` in a `requestAnimationFrame` loop. Latency differences between clients cause < 100ms drift, which is imperceptible.
 
 **Claude API proxied through a serverless route.**
 `ANTHROPIC_API_KEY` lives only in Vercel environment variables. The client never calls Claude directly. `/api/generate` is the only entry point to the AI.
 
-**Host PIN instead of JWT.**
-The host receives a 4-digit PIN when creating a room. The PIN is stored in the `rooms` table. Host-only API calls include the PIN; the server validates it. Any device with the PIN can claim host controls — useful if the host switches devices. No JWT signing infrastructure needed.
+**4-digit host PIN.**
+The host receives a 4-digit PIN when creating a room. The PIN is stored in the `rooms` table. Host-only API calls include the PIN; the server validates it. Any device with the PIN can claim host controls — useful if the host switches devices.
 
 **Anonymous guests.**
-No accounts, no login. Each guest gets a UUID on first visit, stored in localStorage. This UUID is their identity for vote deduplication and reconnection.
+Each guest gets a UUID on first visit, stored in localStorage. This UUID is their identity for vote deduplication and reconnection.
 
 **YouTube IFrame for audio.**
 Each song in the catalog has a `youtubeId` in `songs.json`. The karaoke screen embeds a YouTube player using the IFrame API. The host's "Let's Sing" button calls `player.playVideo()` and records `songStartedAt` simultaneously. YouTube handles all audio licensing via their platform terms.
@@ -146,7 +146,7 @@ Supabase Realtime is enabled on:
 
 ### 3.4 Static Catalog Data
 
-Catalog data is static JSON — no database table needed for v1.
+Catalog data is static JSON files served at build time.
 
 ```
 data/songs.json         — [{ id, title, artist, youtubeId, durationSeconds, lineCount }]
@@ -236,7 +236,7 @@ Receive songStartedAt from Supabase Realtime
 
 Guest sync is approximate (typically < 500ms off on good WiFi). This is acceptable — guests are reading along on their phones, not controlling playback.
 
-**Why two approaches:** Only the host has the YouTube player. Guests cannot call `getCurrentTime()`. Broadcasting the player position every frame via Supabase would be too expensive. The timestamp approach is the lightest viable solution for guest phones.
+**Why two approaches:** Only the host screen runs the YouTube player and can call `getCurrentTime()`. Guest phones use the broadcast `songStartedAt` timestamp — lightweight and accurate enough for reading lyrics.
 
 ### 4.5 Host PIN Flow
 
@@ -253,9 +253,9 @@ Guest sync is approximate (typically < 500ms off on good WiFi). This is acceptab
 ### 4.6 YouTube Integration
 
 - Each song in `songs.json` has a `youtubeId` field
-- On the karaoke screen, the host view renders a YouTube IFrame player (can be minimized but not hidden — YouTube ToS requires the player to be visible)
+- On the karaoke screen, the host view renders a YouTube IFrame player — kept visible at all times per YouTube ToS
 - `player.playVideo()` is called when host presses "Let's Sing"; `player.stopVideo()` on song end
-- Guest phone views do not render the YouTube player — they only see the lyric display
+- Guest phone views show the lyric display only
 
 ---
 

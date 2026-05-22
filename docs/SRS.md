@@ -6,7 +6,7 @@
 This document defines what AI Karaoke will do — every feature, constraint, and acceptance condition. It is the source of truth for scope decisions.
 
 ### 1.2 Scope
-Web app for same-room groups. One host (laptop/TV), multiple guests (phones). No audio playback. No accounts.
+Web app for same-room groups. One host (laptop/TV), multiple guests (phones). Audio plays via YouTube IFrame on the host screen. Guests join anonymously.
 
 ### 1.3 Definitions
 
@@ -32,10 +32,10 @@ The system shall create a room with a unique 6-character alphanumeric code when 
 On room creation, the system shall generate a 4-digit PIN and return it to the host. The host stores it in localStorage. Any device that enters the correct PIN for a room gains host controls for that session.
 
 ### FR-3 — Join Room
-Guests shall join a room by entering the room code manually or scanning a QR code. No name, no account, no install required.
+Guests shall join a room by entering the room code manually or scanning a QR code. Access is instant — any browser, no install, no account.
 
 ### FR-4 — QR Code Persistence
-A QR code encoding the join URL shall be visible in the bottom-right corner of every screen after room creation. It is never hidden.
+A QR code encoding the join URL shall be visible in the bottom-right corner of every screen after room creation. It is always visible.
 
 ### FR-5 — Guest Count
 A live headcount badge shall display the number of guests currently in the room, updated in real time.
@@ -48,7 +48,7 @@ room → voting → generating → karaoke → room → ...
 Every state transition is broadcast to all connected clients, who switch screens on receipt.
 
 ### FR-7 — Anonymous Guest Identity
-Guests are identified by a UUID generated client-side on first visit and stored in localStorage. No nickname or account is required or collected.
+Guests are identified by a UUID generated client-side on first visit and stored in localStorage. Only data stored: the UUID and vote selections.
 
 ### FR-8 — Reconnection
 On reconnect, the client shall read the current room state via REST and jump to the correct screen. No re-join prompt, no data loss.
@@ -114,13 +114,13 @@ Lyrics shall be rendered in a CSS grid where each column represents one syllable
 Words with multiple syllables span multiple grid columns using `grid-column: span N`.
 
 ### FR-28 — Synchronized Line Wrapping
-If a line is too wide for the screen, both rows (generated + original) must wrap at the same syllable-column boundary. The two rows must never wrap independently.
+If a line is too wide for the screen, both rows (generated + original) must wrap at the same syllable-column boundary. Both rows always wrap together at the same syllable-column boundary.
 
 ### FR-29 — Line Highlight
 The current active line shall be highlighted with an accent-yellow full-line background bar. Previous and next lines are visible at reduced opacity.
 
 ### FR-30 — In-App Audio Playback
-The karaoke screen shall embed a YouTube IFrame player. Each song in the catalog has a `youtubeId`. The player is visible on the host/TV screen only. Guest phones show lyrics only — no audio player.
+The karaoke screen shall embed a YouTube IFrame player. Each song in the catalog has a `youtubeId`. The player is visible on the host/TV screen. Guest phones show the lyric display.
 
 ### FR-31 — Karaoke Timing Sync
 When the host presses "Let's Sing", the YouTube player starts and `songStartedAt` is recorded in the database when YouTube fires `onStateChange(PLAYING)`.
@@ -164,20 +164,20 @@ After the song ends, a brief recap screen shows the song × dataset combo just p
 
 ### 3.2 Reliability
 
-- Good WiFi environment is assumed. No offline mode required.
-- Votes are persisted to the server immediately on submit, not on session close.
-- On reconnect, clients restore state from a REST endpoint — no data loss, no re-join prompt.
+- Good WiFi environment is assumed.
+- Votes are persisted to the server immediately on submit.
+- On reconnect, clients restore state from a REST endpoint — guests resume exactly where they left off.
 
 ### 3.3 Security
 
 - Host controls are gated by a 4-digit room PIN (stored server-side, entered once and cached in localStorage).
-- The Claude API key is never exposed to the client — all AI calls go through a server-side API route.
-- No sensitive user data is collected.
+- The Claude API key stays server-side; all AI calls go through a server-side API route.
+- Only anonymous data is stored: UUIDs and vote selections.
 
 ### 3.4 Scale (v1 targets)
 
 - Up to 20 guests per room.
-- Single-room use case (one party). No horizontal scaling required.
+- Single-room use case (one party at a time).
 
 ---
 
@@ -193,7 +193,7 @@ After the song ends, a brief recap screen shows the song × dataset combo just p
 ### US-2: Guest joins by scanning QR
 **As a guest**, I want to scan a QR code and be in the session immediately.
 
-- Scanning opens the app in a browser — no install, no name prompt, no account
+- Scanning opens the app in any browser — instant access, works immediately
 - Guest lands directly on the vote feed
 - Guest count badge increments on all screens within 500ms
 
@@ -248,7 +248,7 @@ After the song ends, a brief recap screen shows the song × dataset combo just p
 
 - Votes are saved to the server immediately on submit
 - On reconnect, the client reads current room state and jumps to the correct screen
-- Guest UUID from localStorage persists — no re-join prompt
+- Guest UUID from localStorage persists — guests resume exactly where they left off
 
 ---
 
@@ -264,7 +264,7 @@ After the song ends, a brief recap screen shows the song × dataset combo just p
 | Someone Like You | Adele |
 | Don't Stop Believin' | Journey |
 
-LRC timing files are pre-built as static JSON in `data/lrc/`. Timestamps are approximations; replace by fetching lrclib.net when network access is available.
+LRC timing files are pre-built as static JSON in `data/lrc/`. Timestamps are approximations; fetch from lrclib.net to improve accuracy.
 
 ### Datasets
 
