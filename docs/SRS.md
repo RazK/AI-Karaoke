@@ -28,8 +28,8 @@ Web app for same-room groups. One host (laptop/TV), multiple guests (phones). Au
 ### FR-1 — Create Room
 The system shall create a room with a unique 6-character alphanumeric code when a host requests it. Room creation must complete in under 2 seconds.
 
-### FR-2 — Host PIN
-On room creation, the system shall generate a 4-digit PIN and return it to the host. The host stores it in localStorage. Any device that enters the correct PIN for a room gains host controls for that session.
+### FR-2 — Host Identity
+The device that creates the room is the host. Its guest UUID is stored as `host_guest_id` in the room. Host controls are shown on any client whose localStorage UUID matches `host_guest_id`.
 
 ### FR-3 — Join Room
 Guests shall join a room by entering the room code manually or scanning a QR code. Access is instant — any browser, no install, no account.
@@ -189,8 +189,8 @@ After the song ends, a brief recap screen shows the song × dataset combo just p
 **As a host**, I want to create a room instantly so guests can join with minimal friction.
 
 - Clicking "Create Room" creates a room in < 2 seconds
-- A 6-character room code, QR code, and host PIN are shown immediately
-- The host PIN is stored in localStorage; the host is taken to the room screen
+- A 6-character room code and QR code are shown immediately
+- The host is taken directly to the room screen with host controls visible
 
 ### US-2: Guest joins by scanning QR
 **As a guest**, I want to scan a QR code and be in the session immediately.

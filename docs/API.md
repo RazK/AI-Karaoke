@@ -7,7 +7,7 @@
 - Error shape: `{ "error": "human-readable message" }`
 - Room codes are 6 uppercase alphanumeric characters (e.g. `XKCD42`)
 - Guest IDs are UUIDs, generated client-side and persisted in localStorage
-- Host authentication uses a 4-digit PIN passed in the request body
+- Host actions are authenticated by sending `guestId` — the server checks it against `rooms.host_guest_id`
 
 ---
 
@@ -24,13 +24,10 @@ Create a new room. The caller becomes the host.
 
 **Response `201`**
 ```json
-{
-  "roomCode": "XKCD42",
-  "hostPin": "4829"
-}
+{ "roomCode": "XKCD42" }
 ```
 
-The host stores `hostPin` in localStorage as `hostPin_XKCD42`. All host-only actions require this PIN. Any device that enters the correct PIN gains host controls.
+The `hostGuestId` sent in the request is stored as `host_guest_id` in the room. The creating device already has this UUID in localStorage — it will automatically render host controls on reconnect.
 
 ---
 
@@ -125,7 +122,7 @@ Start a 30-second timed voting round. Host only.
 
 **Request body**
 ```json
-{ "hostPin": "4829" }
+{ "guestId": "uuid" }
 ```
 
 **Response `202`**
@@ -143,7 +140,7 @@ End the voting round early and proceed with current leaders. Host only.
 
 **Request body**
 ```json
-{ "hostPin": "4829" }
+{ "guestId": "uuid" }
 ```
 
 **Response `202`**
@@ -194,9 +191,9 @@ Trigger AI lyric generation. Host only.
 **Request body**
 ```json
 {
+  "guestId": "uuid",
   "songId": "bohemian-rhapsody",
   "datasetId": "ikea-manuals",
-  "hostPin": "4829",
   "bustCache": false
 }
 ```
@@ -225,7 +222,7 @@ Record the song start timestamp. Called by the host client when YouTube fires `o
 
 **Request body**
 ```json
-{ "hostPin": "4829", "songStartedAt": 1716000000000 }
+{ "guestId": "uuid", "songStartedAt": 1716000000000 }
 ```
 
 **Response `200`**
@@ -243,7 +240,7 @@ Transition room from `karaoke` → `room` (back to vote feed). Host only.
 
 **Request body**
 ```json
-{ "hostPin": "4829" }
+{ "guestId": "uuid" }
 ```
 
 **Response `200`**

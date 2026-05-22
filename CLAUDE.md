@@ -12,7 +12,7 @@ Party karaoke web app. Read `docs/SDD.md` for architecture, `docs/API.md` for en
 - **Audio:** YouTube IFrame API — embedded on the host/TV karaoke screen; each song has a `youtubeId` in `songs.json`
 - **Timing — host:** `player.getCurrentTime() * 1000` in a RAF loop → frame-accurate sync to audio
 - **Timing — guests:** `Date.now() - songStartedAt` in a RAF loop → < 500ms drift, acceptable for reading lyrics
-- **Host auth:** 4-digit PIN stored in `rooms.host_pin`; sent in request body for host-only actions
+- **Host auth:** `host_guest_id` stored in `rooms`; host controls render on the client whose localStorage UUID matches it
 - **Guests:** Anonymous. UUID in `localStorage` is the only identity.
 - **Voting:** Feed-based upvote (search → propose → upvote). Host starts a 30s timed round. Winning combo = top-voted song × top-voted dataset independently.
 - **Word-level highlight:** v1 highlights the full active line. Word-level is a future enhancement.

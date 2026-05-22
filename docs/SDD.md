@@ -66,8 +66,8 @@ The host presses "Let's Sing", which simultaneously starts the YouTube player an
 **Claude API proxied through a serverless route.**
 `ANTHROPIC_API_KEY` lives only in Vercel environment variables. The client never calls Claude directly. `/api/generate` is the only entry point to the AI.
 
-**4-digit host PIN.**
-The host receives a 4-digit PIN when creating a room. The PIN is stored in the `rooms` table. Host-only API calls include the PIN; the server validates it. Any device with the PIN can claim host controls — useful if the host switches devices.
+**Host identity via UUID.**
+The device that creates the room is the host. Its guest UUID is stored as `host_guest_id`. All clients fetch the room's `host_guest_id` on join; any client whose localStorage UUID matches it renders host controls. No separate auth step needed.
 
 **Anonymous guests.**
 Each guest gets a UUID on first visit, stored in localStorage. This UUID is their identity for vote deduplication and reconnection.
@@ -88,7 +88,6 @@ CREATE TABLE rooms (
   state           TEXT        NOT NULL DEFAULT 'room',
   -- state values: 'room' | 'voting' | 'generating' | 'karaoke'
   host_guest_id   UUID        NOT NULL,
-  host_pin        CHAR(4)     NOT NULL,
   song_id         TEXT,
   dataset_id      TEXT,
   song_started_at BIGINT,     -- Unix ms; set when host starts karaoke
@@ -238,16 +237,15 @@ Guest sync is approximate (typically < 500ms off on good WiFi). This is acceptab
 
 **Why two approaches:** Only the host screen runs the YouTube player and can call `getCurrentTime()`. Guest phones use the broadcast `songStartedAt` timestamp — lightweight and accurate enough for reading lyrics.
 
-### 4.5 Host PIN Flow
+### 4.5 Host Identity Flow
 
 ```
-1. POST /api/rooms  →  server generates 4-digit PIN
-2. Server stores PIN in rooms.host_pin
-3. Response: { roomCode, hostPin }
-4. Client stores hostPin in localStorage as hostPin_<roomCode>
-5. Host-only API calls include { hostPin } in request body
-6. Server validates: SELECT 1 FROM rooms WHERE code=$1 AND host_pin=$2
-7. Any device can claim host by entering the correct PIN
+1. POST /api/rooms  →  client sends { hostGuestId: uuid }
+2. Server stores hostGuestId in rooms.host_guest_id
+3. Response: { roomCode }
+4. All clients fetch host_guest_id when joining
+5. Host-only API calls send { guestId } — server checks guestId === host_guest_id
+6. Host controls render on the device whose localStorage UUID matches host_guest_id
 ```
 
 ### 4.6 YouTube Integration
