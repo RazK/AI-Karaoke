@@ -73,13 +73,14 @@ export default function PickerScreen({ onGenerate }: PickerScreenProps) {
             padding: '24px 16px 0 24px',
             overflow: 'hidden',
             borderRight: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(124,58,237,0.04)',
           }}
         >
           <h2
             style={{
               fontSize: '20px',
               fontWeight: 700,
-              color: '#F8FAFC',
+              color: '#A78BFA',
               marginBottom: '12px',
               flexShrink: 0,
             }}
@@ -115,7 +116,7 @@ export default function PickerScreen({ onGenerate }: PickerScreenProps) {
               gap: '8px',
               overflowY: 'auto',
               flex: 1,
-              paddingBottom: '16px',
+              padding: '4px 8px 16px 8px',
             }}
           >
             {filteredSongs.length === 0 ? (
@@ -176,13 +177,14 @@ export default function PickerScreen({ onGenerate }: PickerScreenProps) {
             flexDirection: 'column',
             padding: '24px 24px 0 16px',
             overflow: 'hidden',
+            background: 'rgba(6,182,212,0.04)',
           }}
         >
           <h2
             style={{
               fontSize: '20px',
               fontWeight: 700,
-              color: '#F8FAFC',
+              color: '#22D3EE',
               marginBottom: '12px',
               flexShrink: 0,
             }}
@@ -218,7 +220,7 @@ export default function PickerScreen({ onGenerate }: PickerScreenProps) {
               gap: '8px',
               overflowY: 'auto',
               flex: 1,
-              paddingBottom: '16px',
+              padding: '4px 8px 16px 8px',
             }}
           >
             {filteredDatasets.length === 0 ? (
@@ -306,7 +308,11 @@ export default function PickerScreen({ onGenerate }: PickerScreenProps) {
         >
           {canGenerate
             ? `Generate: ${selectedSong!.title} × ${selectedDataset!.label}`
-            : 'Select a song and dataset to generate'}
+            : selectedSong && !selectedDataset
+            ? `🎵 ${selectedSong.title} × pick a dataset`
+            : !selectedSong && selectedDataset
+            ? `pick a song × 📋 ${selectedDataset.label}`
+            : 'Select a song and a dataset to generate'}
         </button>
       </div>
     </div>

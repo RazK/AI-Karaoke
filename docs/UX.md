@@ -108,8 +108,9 @@ v1 has three screens: **Picker → Generating → Karaoke**
 
 **Layout:**
 - Two equal-width columns side by side: **Songs** on the left, **Datasets** on the right
-- Each column has a section header, a search bar, and a vertically scrollable list of cards below
-- The two columns fill the available screen height equally; each list scrolls independently
+- Songs column has a subtle violet background tint (`rgba(124,58,237,0.04)`); Datasets column has a subtle cyan tint (`rgba(6,182,212,0.04)`) — makes the two halves visually distinct at a glance
+- Each column has a section header (violet for Songs, cyan for Datasets), a search bar, and a vertically scrollable list of cards below
+- The scrollable card list has horizontal padding large enough that selected cards' glow and scale are never clipped
 - Cards are full-width within their column — horizontal items, not square tiles
 
 **Card anatomy (Song):**
@@ -129,15 +130,18 @@ v1 has three screens: **Picker → Generating → Karaoke**
 ```
 
 **Selected state:**
-- Song card selected: `border: 1px solid transparent` replaced by a violet gradient stroke + `box-shadow: 0 0 20px rgba(124,58,237,0.3)` + `background: rgba(124,58,237,0.08)`
+- Song card selected: `border: 1px solid rgba(124,58,237,0.6)` + `box-shadow: 0 0 20px rgba(124,58,237,0.3)` + `background: rgba(124,58,237,0.08)` + `scale(1.02)`
 - Dataset card selected: same treatment using cyan — `box-shadow: 0 0 20px rgba(6,182,212,0.3)` + `background: rgba(6,182,212,0.08)`
+- Card list scroll container has `padding: 4px 8px` so the scale + glow are never clipped by overflow
 - Selection persists while the host searches — the selected card remains highlighted even if scrolled out of view
 
 **Generate button:**
 - Spans the full width of both columns combined, pinned to the bottom of the screen
-- Disabled (50% opacity, no interaction) until both a song and a dataset are selected
-- When one or both are missing: *"Select a song and dataset to generate"*
-- When both are selected: *"Generate: Bohemian Rhapsody × IKEA Manuals"* — gradient background, fully active
+- Always shows the current selection state as a fill-in-the-blank:
+  - Neither selected: *"Select a song and a dataset to generate"* — disabled, 40% opacity
+  - Song only: *"🎵 Bohemian Rhapsody × pick a dataset"* — disabled, 40% opacity
+  - Dataset only: *"pick a song × 📋 IKEA Manuals"* — disabled, 40% opacity
+  - Both selected: *"Generate: Bohemian Rhapsody × IKEA Manuals"* — fully active, gradient background
 
 **Search:** Each column has its own search bar. Typing filters that column's card list in real time. Cards not matching the query disappear immediately; the selected card reappears if the query is cleared. Shows *"No matches"* if nothing in that column matches.
 
