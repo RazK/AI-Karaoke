@@ -7,7 +7,7 @@
 - Error shape: `{ "error": "human-readable message" }`
 - Room codes are 6 uppercase alphanumeric characters (e.g. `XKCD42`)
 - Guest IDs are UUIDs, generated client-side and persisted in localStorage
-- Host authentication uses a 4-digit PIN passed in the request body — no JWT
+- Host authentication uses a 4-digit PIN passed in the request body
 
 ---
 
@@ -36,14 +36,14 @@ The host stores `hostPin` in localStorage as `hostPin_XKCD42`. All host-only act
 
 ### `POST /api/rooms/:code/join`
 
-Join a room as a guest. Guests are fully anonymous — no nickname collected.
+Join a room as a guest. Guests are anonymous.
 
 **Request body**
 ```json
 { "guestId": "uuid" }
 ```
 
-**Validation:** Room must exist and not be full (max 20 guests).
+**Validation:** Room must exist with fewer than 20 guests.
 
 **Response `200`**
 ```json
@@ -283,7 +283,7 @@ Emitted by the server during Claude API call via a Supabase Realtime broadcast (
 }
 ```
 
-Clients use this to animate the progress bar. The bar never exceeds ~90% until `rooms.state` changes to `karaoke`.
+Clients use this to animate the progress bar. The bar fills to ~90% and completes when `rooms.state` changes to `karaoke`.
 
 ---
 
@@ -338,4 +338,4 @@ After each Claude response:
 
 ### Model
 
-Use `claude-sonnet-4` (`claude-sonnet-4-20250514`). Do not use Haiku for this task — syllable constraint compliance requires the stronger model.
+Use `claude-sonnet-4` (`claude-sonnet-4-20250514`). Syllable constraint compliance requires this model.

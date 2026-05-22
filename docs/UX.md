@@ -35,7 +35,7 @@ Use a bold, rounded sans-serif: **Nunito**, **Poppins**, or **Rubik**.
 
 | Element | Behavior |
 |---|---|
-| Line transitions | Smooth upward scroll, 300ms ease-out — never instant cuts |
+| Line transitions | Smooth upward scroll, 300ms ease-out |
 | Word highlight | Instant swap, 0ms — must feel beat-accurate |
 | Progress bar fill | `transition: width 100ms linear` |
 | Screen transitions | Cross-fade 200ms |
@@ -44,7 +44,7 @@ Use a bold, rounded sans-serif: **Nunito**, **Poppins**, or **Rubik**.
 ### Layout Rules
 
 - `height: 100svh` (not `100vh`) on all full-screen pages — handles mobile browser chrome correctly
-- `overflow-x: hidden` on root — no horizontal scroll at any breakpoint
+- `overflow-x: hidden` on root — all content contained within 100vw at every breakpoint
 - Minimum tap target: 48×48px on all interactive elements
 
 ---
@@ -83,7 +83,7 @@ Use a bold, rounded sans-serif: **Nunito**, **Poppins**, or **Rubik**.
 
 **Purpose:** Idle state between rounds. Vote feed visible, no timer. Host has a "Start Voting" button.
 
-**Guest count:** Single unobtrusive headcount badge: "👥 8 in the room" — small, top-right. No names, no avatars.
+**Guest count:** Single unobtrusive headcount badge: "👥 8 in the room" — small, top-right. Anonymous — headcount only.
 
 #### Desktop (TV):
 - Two columns side-by-side: **Songs** (left, blue) | **Datasets** (right, orange)
@@ -93,7 +93,6 @@ Use a bold, rounded sans-serif: **Nunito**, **Poppins**, or **Rubik**.
 - Host-only controls: **"Start Voting"** button (bottom-center, prominent)
 - Manual override: host can tap any song tile and any dataset tile to pick them, then tap **"Start with This Combo"**
 - Guest count badge top-right; QR code bottom-right
-- No timer shown — this is the between-rounds idle state
 
 #### Mobile (Guest):
 - Fixed search bar at top (searches songs AND datasets simultaneously)
@@ -104,7 +103,6 @@ Use a bold, rounded sans-serif: **Nunito**, **Poppins**, or **Rubik**.
 - Proposing: search result not in the feed → tap adds it with count 1, appears last, rises as others vote
 - One song vote and one dataset vote at a time; changeable any time
 - Guest count badge: small, below search bar
-- No timer shown
 
 ---
 

@@ -7,22 +7,22 @@ Party karaoke web app. Read `docs/SDD.md` for architecture, `docs/API.md` for en
 ## Architecture (locked — do not re-discuss)
 
 - **Frontend:** Next.js (App Router) on Vercel
-- **Real-time + DB:** Supabase — no Redis, no Socket.io, no Express server
-- **AI:** Vercel serverless function at `app/api/generate/route.ts` — proxies Claude API; key never exposed client-side
+- **Real-time + DB:** Supabase — single managed service for real-time subscriptions and DB
+- **AI:** Vercel serverless function at `app/api/generate/route.ts` — proxies Claude API; key stays server-side
 - **Audio:** YouTube IFrame API — embedded on the host/TV karaoke screen; each song has a `youtubeId` in `songs.json`
 - **Timing — host:** `player.getCurrentTime() * 1000` in a RAF loop → frame-accurate sync to audio
 - **Timing — guests:** `Date.now() - songStartedAt` in a RAF loop → < 500ms drift, acceptable for reading lyrics
-- **Host auth:** 4-digit PIN stored in `rooms.host_pin`; sent in request body for host-only actions; no JWT
-- **Guests:** Fully anonymous. UUID in `localStorage`. No nicknames, no login.
+- **Host auth:** 4-digit PIN stored in `rooms.host_pin`; sent in request body for host-only actions
+- **Guests:** Anonymous. UUID in `localStorage` is the only identity.
 - **Voting:** Feed-based upvote (search → propose → upvote). Host starts a 30s timed round. Winning combo = top-voted song × top-voted dataset independently.
-- **Word-level highlight:** Post-MVP. v1 highlights the full active line only.
+- **Word-level highlight:** v1 highlights the full active line. Word-level is a future enhancement.
 - **Deployment:** Vercel auto-deploys `main`. PR preview URLs for testing.
 
 ## Branch state
 
 | Branch | Status | Description |
 |---|---|---|
-| `main` | ✅ current | Docs only — no app code yet |
+| `main` | ✅ current | Docs only — app scaffold is next |
 
 ## Build phases (in order)
 
