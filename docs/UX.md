@@ -78,45 +78,70 @@ v1 has three screens: **Picker → Generating → Karaoke**
 **Purpose:** Host selects a song and a dataset, then generates.
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│  AI Karaoke                                              │
-│  "The AI rewrote your songs. You still have to sing them."│
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  🎵 Pick a Song          🔍 [search songs...   ]        │
-│                                                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
-│  │ Bohemian     │  │ Never Gonna  │  │ Africa       │   │
-│  │ Rhapsody     │  │ Give You Up  │  │              │   │
-│  │ Queen · 5:54 │  │ Rick · 3:33  │  │ Toto · 4:55  │   │
-│  └──────────────┘  └──────────────┘  └──────────────┘   │
-│                                                          │
-│  📋 Pick a Dataset       🔍 [search datasets...]        │
-│                                                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
-│  │ Yelp Reviews │  │ IKEA Manuals │  │ Horoscopes   │   │
-│  │ (1-star)     │  │              │  │              │   │
-│  │ Angry guests │  │ Assembly ins │  │ Vague cosmic │   │
-│  └──────────────┘  └──────────────┘  └──────────────┘   │
-│                                                          │
-│              [ Generate ← accent-purple, full-width ]    │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│  AI Karaoke                                                            │
+│  "The AI rewrote your songs. You still have to sing them."             │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│   🎵 Songs                        📋 Datasets                         │
+│   🔍 [search songs...    ]        🔍 [search datasets...    ]         │
+│                                                                        │
+│  ┌──────────────────────────────┐ ┌──────────────────────────────┐    │
+│  │ Bohemian Rhapsody          ↑ │ │ Yelp Reviews (1-star)      ↑ │    │
+│  │ Queen · 5:54                 │ │ Furious customer complaints  │    │
+│  ├──────────────────────────────┤ ├──────────────────────────────┤    │
+│  │ Never Gonna Give You Up      │ │ IKEA Manuals                 │    │  ← selected
+│  │ Rick Astley · 3:33           │ │ Step-by-step assembly ins…   │    │
+│  ├──────────────────────────────┤ ├──────────────────────────────┤    │
+│  │ Africa                     ↓ │ │ Legal Disclaimers            │    │
+│  │ Toto · 4:55                  │ │ Terms of service boilerplate │    │
+│  └──────────────────────────────┘ ├──────────────────────────────┤    │
+│                                   │ Horoscopes                 ↓ │    │
+│                                   │ Vague cosmic predictions    │    │
+│                                   └──────────────────────────────┘    │
+│                                                                        │
+│        [ Generate: Never Gonna Give You Up × IKEA Manuals ]           │
+│                    ← accent-purple, full-width →                       │
+│                                                                        │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Layout:**
-- Two sections stacked vertically: Songs on top, Datasets below
-- Each section: search bar + horizontally scrollable card row
-- Cards: fixed width (~180px desktop, ~140px mobile), rounded, `bg-card`
-- **Selected state:** accent-colored border (blue for songs, orange for datasets) + subtle scale-up
-- One song and one dataset selected at a time
+- Two equal-width columns side by side: **Songs** on the left, **Datasets** on the right
+- Each column has a section header, a search bar, and a vertically scrollable list of cards below
+- The two columns fill the available screen height equally; each list scrolls independently
+- Cards are full-width within their column — horizontal items, not square tiles
+
+**Card anatomy (Song):**
+```
+┌─────────────────────────────────────────────┐
+│  Bohemian Rhapsody                           │  ← title, 18px, weight 600, text-primary
+│  Queen · 5:54                                │  ← artist · duration, 14px, text-secondary
+└─────────────────────────────────────────────┘
+```
+
+**Card anatomy (Dataset):**
+```
+┌─────────────────────────────────────────────┐
+│  IKEA Manuals                                │  ← label, 18px, weight 600, text-primary
+│  Step-by-step assembly instructions          │  ← description, 14px, text-secondary
+└─────────────────────────────────────────────┘
+```
+
+**Selected state:**
+- Song card selected: `border: 1px solid transparent` replaced by a violet gradient stroke + `box-shadow: 0 0 20px rgba(124,58,237,0.3)` + `background: rgba(124,58,237,0.08)`
+- Dataset card selected: same treatment using cyan — `box-shadow: 0 0 20px rgba(6,182,212,0.3)` + `background: rgba(6,182,212,0.08)`
+- Selection persists while the host searches — the selected card remains highlighted even if scrolled out of view
 
 **Generate button:**
-- Full-width, accent-purple
-- Disabled until both a song and dataset are selected
-- When active, shows the combo: *"Generate: Bohemian Rhapsody × IKEA Manuals"*
+- Spans the full width of both columns combined, pinned to the bottom of the screen
+- Disabled (50% opacity, no interaction) until both a song and a dataset are selected
+- When one or both are missing: *"Select a song and dataset to generate"*
+- When both are selected: *"Generate: Bohemian Rhapsody × IKEA Manuals"* — gradient background, fully active
 
-**Search:** Filters cards in real time as the host types. Shows *"No matches"* if nothing found.
+**Search:** Each column has its own search bar. Typing filters that column's card list in real time. Cards not matching the query disappear immediately; the selected card reappears if the query is cleared. Shows *"No matches"* if nothing in that column matches.
+
+**Rationale for two columns:** The app runs on landscape screens (laptop, TV). A two-column layout fills horizontal space naturally, keeps both choices visible simultaneously without scrolling past each other, and mirrors the left-to-right selection flow: pick a song, then pick a dataset, then generate.
 
 ---
 
