@@ -205,7 +205,9 @@ export default function GeneratingScreen({ song, dataset, onDone }: GeneratingSc
             margin: 0,
           }}
         >
-          🎵 {song.title} × 📋 {dataset.label}
+          <span style={{ whiteSpace: 'nowrap' }}>🎵 {song.title}</span>
+          {' × '}
+          <span style={{ whiteSpace: 'nowrap' }}>📋 {dataset.label}</span>
         </h1>
 
         {/* Progress bar */}
