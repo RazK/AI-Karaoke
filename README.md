@@ -5,7 +5,7 @@ Party karaoke where an AI rewrites the lyrics. Pick a song, pick a dataset, watc
 ## How it works
 
 1. Host opens the app on a laptop or TV — a room code + QR code appear
-2. Guests scan with their phones — no account, no name, instantly in
+2. Guests scan with their phones — open the app, instantly in
 3. Everyone votes for songs and datasets from a live feed on their phones
 4. AI rewrites the lyrics syllable-for-syllable using the chosen dataset
 5. Song plays inside the app; lyrics scroll karaoke-style in sync
@@ -24,7 +24,7 @@ Party karaoke where an AI rewrites the lyrics. Pick a song, pick a dataset, watc
 
 ## Setup
 
-> The app is not scaffolded yet — setup instructions will be added when the Next.js project is initialized.
+> Setup instructions will be added once the Next.js project is initialized.
 
 You will need:
 - A Supabase project (free tier) — copy the URL and anon key

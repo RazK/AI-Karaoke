@@ -81,7 +81,7 @@ Use a bold, rounded sans-serif: **Nunito**, **Poppins**, or **Rubik**.
 
 ### Screen 2 — Room (Between Rounds)
 
-**Purpose:** Idle state between rounds. Vote feed visible, no timer. Host has a "Start Voting" button.
+**Purpose:** Idle state between rounds. Vote feed visible. Host has a "Start Voting" button.
 
 **Guest count:** Single unobtrusive headcount badge: "👥 8 in the room" — small, top-right. Anonymous — headcount only.
 
@@ -117,13 +117,13 @@ Use a bold, rounded sans-serif: **Nunito**, **Poppins**, or **Rubik**.
   - **Songs** (left, blue) — ranked list with animated vote bars
   - **Datasets** (right, orange) — ranked list with animated vote bars
 - Each entry: rank + title + vote bar filling proportionally
-- Items reorder live as votes arrive (animated, not instant jump)
+- Items reorder live as votes arrive with smooth animated transitions
 - Guest count badge top-right; QR code bottom-right
 - Host-only: **"End Voting Now"** button (ends timer, picks current leaders)
 
 #### Mobile (Guest — Vote View):
 - Same search bar + two stacked carousels as Screen 2 (layout unchanged)
-- **Timer:** draining full-width progress bar at the very top — `accent-yellow`, 4px height, drains from full to empty over 30 seconds; no number on mobile
+- **Timer:** draining full-width progress bar at the very top — `accent-yellow`, 4px height, drains from full to empty over 30 seconds
 - Same upvote mechanics — guests can still change votes during the round
 - When timer expires: carousels dim, "Voting closed" overlay, auto-transition to Screen 4
 
@@ -136,7 +136,7 @@ Use a bold, rounded sans-serif: **Nunito**, **Poppins**, or **Rubik**.
 #### Desktop:
 - Full-screen dark
 - Center: Song × Dataset label — *"Bohemian Rhapsody × IKEA Manuals"* — large, bold, white
-- Progress bar: 60% of screen width, rounded, fills from 0 → ~90% (never completes until lyrics arrive)
+- Progress bar: 60% of screen width, rounded, fills from 0 → ~90% and completes when lyrics arrive
 - Rotating flavor text beneath, changes every 2.5s with fade-in:
   - *"Measuring in millimeters…"*
   - *"Consulting the manual…"*
@@ -176,7 +176,7 @@ gen:  [tight·en      ][the   ][left  ][bolt  ]   ← tight·en spans 2 cols
 orig: [is    ][this  ][the   ][real  ][life  ]   ← 1 col each
 ```
 
-**Wrap rule — CRITICAL:** If the syllable grid is too wide for the screen, split at the same syllable-column boundary for both rows. Never let the two rows wrap independently.
+**Wrap rule — CRITICAL:** If the syllable grid is too wide for the screen, split at the same syllable-column boundary for both rows. Both rows always wrap together.
 
 ✅ CORRECT:
 ```
@@ -193,7 +193,7 @@ orig: [is    ][this  ][the   ][real  ][life  ]   ← 1 col each
 
 #### Line Highlight (v1)
 
-The entire current active line has an `accent-yellow` background bar behind both rows. Word-level highlighting is post-MVP.
+The entire current active line has an `accent-yellow` background bar behind both rows. Word-level highlighting is a future enhancement.
 
 | Line state | Generated | Original |
 |---|---|---|
@@ -209,7 +209,7 @@ The entire current active line has an `accent-yellow` background bar behind both
 - `accent-yellow` fill on `bg-card` track
 - Fills left-to-right as song progresses
 - Driven by `player.getCurrentTime()` (host) or `Date.now() - songStartedAt` (guests), updated every 100ms
-- Display-only in v1 (no scrubbing)
+- Display-only
 - Time label right-aligned: `2:14 / 5:54`
 
 ---
@@ -242,7 +242,7 @@ The entire current active line has an `accent-yellow` background bar behind both
 
 **Top bar (fixed):** Song × dataset label with emoji | Regenerate button (host only, ghost style, small) | QR code (120×120px)
 
-**YouTube player:** Visible as required by YouTube ToS. Position: small, minimized in top-right of the content area. Does not obstruct lyrics.
+**YouTube player:** Always visible per YouTube ToS. Position: small, top-right of the content area, clear of the lyric display.
 
 **Line display area:** 3 lyric units visible. Current line full opacity + highlight. Lines slide upward as song progresses.
 
@@ -273,9 +273,8 @@ The entire current active line has an `accent-yellow` background bar behind both
 └────────────────────────────┘
 ```
 
-- No YouTube player on guest phones
 - `height: 100svh` — accounts for mobile browser chrome
-- No horizontal scroll — columns shrink proportionally; wrap rule applies if still too wide
+- Columns shrink proportionally to fit the screen; wrap rule applies if needed
 - Connection status dot: small, top-right corner
 
 ---
@@ -298,7 +297,7 @@ The entire current active line has an `accent-yellow` background bar behind both
 
 ## QR Code — Persistence Rule
 
-The QR code **must appear in the bottom-right corner of every screen after room creation**. Minimum size: 120×120px. It encodes the join URL and is never hidden — a late arrival must be able to scan it mid-song.
+The QR code **must appear in the bottom-right corner of every screen after room creation**. Minimum size: 120×120px. It encodes the join URL and stays visible at all times — a late arrival can scan it mid-song.
 
 ---
 
@@ -321,8 +320,8 @@ Visible only when `localStorage` contains `hostPin_<roomCode>`:
 
 - All tap targets: minimum 48×48px
 - Minimum contrast: 4.5:1 on all text (dim-room condition)
-- No color-only affordances — pair color with shape or icon
-- Font never below 13px
+- Every affordance pairs color with shape or icon
+- Minimum font size: 13px
 - Progress bars: `role="progressbar"` with `aria-valuenow`, `aria-valuemin`, `aria-valuemax`
 
 ---
