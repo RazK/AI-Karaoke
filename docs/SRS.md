@@ -21,7 +21,7 @@ Defines what AI Karaoke will do in each version. Source of truth for scope decis
 ## 2. v1 — Single Device
 
 ### 2.1 Scope
-Single-device web app. One host, one screen (laptop or TV). No phones, no joining, no real-time, no database.
+A web app that runs on one device — a laptop or TV. The host uses it to pick a song and a dataset, generate AI-rewritten lyrics, and sing along to the music playing on screen.
 
 ### 2.2 Functional Requirements
 
@@ -189,4 +189,4 @@ Guests join from their phones via QR code or room code. No account required. Opt
 - Ratings are averaged and stored per combo per device
 - Host sees a "Greatest Hits" catalog: all combos played on this device, sorted by average rating
 - Host can replay any past combo (uses cached lyrics)
-- Combos catalog is per-device (localStorage or local DB) — no accounts needed
+- Combos catalog is stored per-device in localStorage

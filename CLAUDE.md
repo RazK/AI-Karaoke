@@ -10,7 +10,7 @@ Party karaoke app. Read `docs/SDD.md` for architecture, `docs/API.md` for endpoi
 - **Backend:** Single Vercel serverless function at `app/api/generate/route.ts` — Claude API proxy; key stays server-side
 - **Audio:** YouTube IFrame API — embedded on the karaoke screen; each song has a `youtubeId` in `songs.json`
 - **Timing:** `player.getCurrentTime() * 1000` in a RAF loop — frame-accurate sync to audio playback
-- **State:** React state only — no database, no real-time
+- **State:** React state + localStorage
 - **Cache:** Generated lyrics stored in localStorage under `lyrics_<songId>_<datasetId>`
 - **Catalog:** Static JSON files (`data/songs.json`, `data/datasets.json`, `data/lrc/*.json`)
 - **Word-level highlight:** v1 highlights the full active line. Word-level is a future enhancement.

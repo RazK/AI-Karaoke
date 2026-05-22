@@ -2,7 +2,7 @@
 
 ## 1. System Overview
 
-AI Karaoke v1 is a single-device web app. The host opens it on a laptop or TV, picks a song and dataset, generates AI-rewritten lyrics via Claude, and sings along to the YouTube player. No backend database, no real-time sync, no guest devices.
+AI Karaoke v1 is a web app that runs on one device — a laptop or TV. The host picks a song and a dataset, Claude rewrites the lyrics syllable-for-syllable, and the group sings along to the music playing on screen.
 
 ---
 
@@ -47,7 +47,7 @@ YouTube IFrame         localStorage
 | Audio | YouTube IFrame API | Free; YouTube handles licensing and delivery |
 | Lyric timing | LRCLib + `lrc-kit` | Free, keyless, 3M+ songs, millisecond-accurate line timestamps |
 | Hosting | Vercel | Zero-ops, auto-deploys `main`, PR preview URLs |
-| State | React + localStorage | Session-scoped lyrics cache; no database needed in v1 |
+| State | React + localStorage | Session-scoped lyrics cache |
 
 ### 2.4 Key Architectural Decisions
 

@@ -28,7 +28,7 @@ Friend groups (4–15 people) in the same physical space. One host laptop or TV.
 ## Versions
 
 ### v1 — Single Device (current)
-Host-only. Everything runs on one laptop or TV. No phones, no joining, no real-time. Pick → Generate → Sing.
+The host opens the app on a laptop or TV, picks a song and a dataset, generates AI-rewritten lyrics, and sings along. Pick → Generate → Sing.
 
 ### v2 — Phones Join
 Guests join from their phones via QR code or room code. Optional nicknames. Live voting on song + dataset combos from the feed. Companion lyric view on phones.
@@ -40,11 +40,3 @@ Saved combo history per device. After each song, guests rate the combo 1–5 sta
 
 A group of people can gather around a laptop, pick a song and a dataset, watch Claude generate the rewritten lyrics, and sing along to the music — and find it funny.
 
-## v1 Out of Scope
-
-- Guest phones or any multi-device experience
-- Room codes, QR codes, joining mechanics
-- Real-time sync or database
-- Voting system
-- Saved history or ratings
-- User accounts or nicknames
