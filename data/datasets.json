@@ -1,0 +1,32 @@
+[
+  {
+    "id": "ikea-manuals",
+    "label": "IKEA Manuals",
+    "description": "Step-by-step furniture assembly instructions",
+    "free": true
+  },
+  {
+    "id": "yelp-reviews-1star",
+    "label": "Yelp Reviews (1-star)",
+    "description": "Furious one-star restaurant reviews",
+    "free": true
+  },
+  {
+    "id": "legal-disclaimers",
+    "label": "Legal Disclaimers",
+    "description": "Terms and conditions nobody reads",
+    "free": true
+  },
+  {
+    "id": "horoscopes",
+    "label": "Horoscopes",
+    "description": "Vague cosmic predictions",
+    "free": true
+  },
+  {
+    "id": "craigslist-ads",
+    "label": "Craigslist Ads",
+    "description": "Mysterious classified listings",
+    "free": true
+  }
+]

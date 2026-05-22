@@ -1,0 +1,42 @@
+[
+  {
+    "id": "bohemian-rhapsody",
+    "title": "Bohemian Rhapsody",
+    "artist": "Queen",
+    "durationSeconds": 354,
+    "lineCount": 54,
+    "free": true
+  },
+  {
+    "id": "never-gonna-give-you-up",
+    "title": "Never Gonna Give You Up",
+    "artist": "Rick Astley",
+    "durationSeconds": 213,
+    "lineCount": 52,
+    "free": true
+  },
+  {
+    "id": "africa",
+    "title": "Africa",
+    "artist": "Toto",
+    "durationSeconds": 295,
+    "lineCount": 30,
+    "free": true
+  },
+  {
+    "id": "someone-like-you",
+    "title": "Someone Like You",
+    "artist": "Adele",
+    "durationSeconds": 285,
+    "lineCount": 39,
+    "free": true
+  },
+  {
+    "id": "dont-stop-believin",
+    "title": "Don't Stop Believin'",
+    "artist": "Journey",
+    "durationSeconds": 251,
+    "lineCount": 34,
+    "free": true
+  }
+]
