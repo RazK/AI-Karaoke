@@ -65,8 +65,10 @@ Tapping a song card votes for it; tapping again removes the vote. Each guest hol
 ### FR-12 — Start Voting Round
 The host shall be able to start a 30-second timed voting round, transitioning the room from `room` → `voting` state.
 
-### FR-13 — Voting Timer Display
-During `voting` state: a numeric countdown is shown on the TV; a draining full-width progress bar (no number) is shown on phones.
+### FR-13 — Voting Screen Display
+During `voting` state:
+- **TV (host screen):** Large numeric countdown center-top + two live leaderboards side by side — Songs (left) and Datasets (right). Each entry shows rank, title, and a vote bar that fills proportionally and reorders in real time as votes come in.
+- **Phones (guests):** Same vote feed and carousels as the between-rounds screen, with a draining full-width progress bar at the top showing time remaining.
 
 ### FR-14 — Auto-Select Winner
 When the timer expires, the system shall automatically select the top-voted song and top-voted dataset independently, then transition to `generating` state and trigger AI generation.
