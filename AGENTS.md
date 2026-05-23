@@ -28,7 +28,7 @@ This file is the single source of truth for all parallel agent work.
 - Modify `app/ui/v1/` or `app/components/`
 - Change `app/types.ts` field names or types (you may add new optional fields)
 - Merge PRs yourself
-- Push to `main` or `feat/nextjs-scaffold` directly (open a PR instead)
+- Push to `main` directly (open a PR instead)
 - Spend money beyond standard API calls (no paid third-party services)
 
 ### One-time setup the user does before sleeping
@@ -174,21 +174,44 @@ This is the most important piece of work. Take the time to get it right.
 ```bash
 git checkout -b agent/A-lyric-generation
 git push -u origin agent/A-lyric-generation
-mkdir -p scripts/output logs
+mkdir -p scripts/output scripts/prompt_versions logs
 pip install anthropic pyphen
-echo "anthropic\npyphen" > scripts/requirements.txt
+printf "anthropic\npyphen\n" > scripts/requirements.txt
 ```
+
+### Data you will work with
+
+**LRC file format** (`data/lrc/<songId>.json`):
+```json
+{
+  "id": "bohemian-rhapsody",
+  "trackName": "Bohemian Rhapsody",
+  "artistName": "Queen",
+  "durationSeconds": 354,
+  "lines": [
+    { "startMs": 0,    "text": "Is this the real life?" },
+    { "startMs": 2550, "text": "Is this just fantasy?" }
+  ]
+}
+```
+Each line has `startMs` (milliseconds from song start) and `text` (plain string — no pre-split words, no syllable counts). You split and count yourself.
+
+**Dataset corpus files** (`data/datasets/<datasetId>.txt`): plain text files already exist.
+Load directly — do NOT hardcode corpus text. Example:
+```python
+corpus = Path(f"data/datasets/{dataset_id}.txt").read_text()
+```
+
+Available dataset IDs: `ikea-manuals`, `yelp-reviews-1star`, `craigslist-ads`, `horoscopes`, `legal-disclaimers`
 
 ### Syllable counting — use this everywhere
 
 ```python
-import pyphen
-import re
+import pyphen, re
 
 _dic = pyphen.Pyphen(lang='en_US')
 
 def count_syllables(word: str) -> int:
-    """Count syllables in a single word. Strip punctuation first."""
     clean = re.sub(r"[^a-zA-Z']", '', word).lower()
     if not clean:
         return 1
@@ -197,7 +220,6 @@ def count_syllables(word: str) -> int:
 ```
 
 Use this for BOTH annotating the original lyrics AND validating the generated output.
-Never trust the `syllableCount` field in LRC files — always recount from the words.
 
 ### Build `scripts/generate.py`
 
@@ -205,29 +227,75 @@ Never trust the `syllableCount` field in LRC files — always recount from the w
 python scripts/generate.py --song bohemian-rhapsody --dataset ikea-manuals
 ```
 
-Steps the script must do, in order:
+Complete working skeleton — fill in the prompt, wire up the rest:
 
-**Step 1: Load and annotate original lyrics**
-- Load `data/lrc/<songId>.json`
-- For each line, split the text into words and count syllables with `count_syllables()`
-- Compute `syllableCount` from the actual words (do not trust the stored value)
-- Log the annotated lines to `logs/agent-A-status.md` for inspection
+```python
+#!/usr/bin/env python3
+import argparse, json, os, re, sys
+from pathlib import Path
+import pyphen
+import anthropic
 
-**Step 2: Load dataset corpus**
-- For now, use a hardcoded string of IKEA-style instruction text (~500 words)
-- Later this will load from `data/datasets/<datasetId>.txt`
+_dic = pyphen.Pyphen(lang='en_US')
 
-**Step 3: Build prompt and call Claude API**
+def count_syllables(word: str) -> int:
+    clean = re.sub(r"[^a-zA-Z']", '', word).lower()
+    if not clean:
+        return 1
+    positions = _dic.positions(clean)
+    return len(positions) + 1 if positions else 1
 
-Use this exact prompt structure (do not improvise — iterate on this):
+def load_lrc(song_id: str) -> list[dict]:
+    data = json.loads(Path(f"data/lrc/{song_id}.json").read_text())
+    annotated = []
+    for i, line in enumerate(data["lines"]):
+        words = line["text"].split()
+        word_objs = [{"word": w, "syllables": count_syllables(w)} for w in words]
+        syllable_count = sum(w["syllables"] for w in word_objs)
+        annotated.append({
+            "lineIndex": i,
+            "startMs": line["startMs"],
+            "syllableCount": syllable_count,
+            "original": word_objs,
+        })
+    return annotated
 
-```
-You are rewriting song lyrics using text from a provided corpus.
+def validate_lines(lines: list) -> list[str]:
+    errors = []
+    for line in lines:
+        orig_sum = sum(w["syllables"] for w in line["original"])
+        gen_sum  = sum(w["syllables"] for w in line["generated"])
+        if orig_sum != gen_sum:
+            errors.append(
+                f"Line {line['lineIndex']}: original={orig_sum}, generated={gen_sum} — MISMATCH"
+            )
+    return errors
+
+def call_claude(prompt: str) -> list:
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key and Path(".env.local").exists():
+        for line in Path(".env.local").read_text().splitlines():
+            if line.startswith("ANTHROPIC_API_KEY="):
+                api_key = line.split("=", 1)[1]
+    client = anthropic.Anthropic(api_key=api_key)
+    msg = client.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=8192,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    text = msg.content[0].text.strip()
+    # Strip markdown code fences if model adds them despite instructions
+    text = re.sub(r"^```[a-z]*\n?", "", text)
+    text = re.sub(r"\n?```$", "", text)
+    return json.loads(text)
+
+def build_prompt(annotated_lines: list, corpus: str) -> str:
+    return f"""You are rewriting song lyrics using text from a provided corpus.
 
 RULES — follow all of them exactly:
 1. Every generated line MUST have EXACTLY the same syllable count as the original.
    Count carefully. Before writing each line:
-   a. Count the syllables in the original
+   a. Count the syllables in the original (they are provided for you)
    b. Write your generated words
    c. Count again and verify the sums match
    If they don't match, rewrite the line.
@@ -236,117 +304,122 @@ RULES — follow all of them exactly:
 4. Return ONLY valid JSON. No commentary, no code fences, no markdown.
 
 SYLLABLE VERIFICATION EXAMPLE:
-  original: [{"word":"No","syllables":1},{"word":"es-cape","syllables":2},
-             {"word":"from","syllables":1},{"word":"re-al-i-ty","syllables":4}]
+  original: [{{"word":"No","syllables":1}},{{"word":"es-cape","syllables":2}},
+             {{"word":"from","syllables":1}},{{"word":"re-al-i-ty","syllables":4}}]
   sum = 1+2+1+4 = 8
   good generated (sum=8):
-  [{"word":"In-sert","syllables":2},{"word":"screw","syllables":1},
-   {"word":"type","syllables":1},{"word":"A","syllables":1},
-   {"word":"care-ful-ly","syllables":3}]  → 2+1+1+1+3 = 8 ✓
-  bad generated (sum=9, adds extra word):
-  [..."here"(1),"care-ful-ly"(3)] → 9 ✗  WRONG, rewrite.
+  [{{"word":"In-sert","syllables":2}},{{"word":"screw","syllables":1}},
+   {{"word":"type","syllables":1}},{{"word":"A","syllables":1}},
+   {{"word":"care-ful-ly","syllables":3}}]  → 2+1+1+1+3 = 8 ✓
+  bad (sum=9): add "here"(1) → 9 ✗  WRONG, rewrite.
 
 OUTPUT FORMAT — return a JSON array, nothing else:
 [
-  {
+  {{
     "lineIndex": 0,
     "syllableCount": 5,
-    "original":  [{"word": "Is",  "syllables": 1}, ...],
-    "generated": [{"word": "Fix", "syllables": 1}, ...]
-  },
-  ...
+    "startMs": 0,
+    "original":  [{{"word": "Is",  "syllables": 1}}, ...],
+    "generated": [{{"word": "Fix", "syllables": 1}}, ...]
+  }}
 ]
 
 --- ORIGINAL LYRICS (annotated with syllable counts) ---
-{annotated_lyrics_json}
+{json.dumps(annotated_lines, indent=2)}
 
 --- CORPUS ---
-{corpus_text}
-```
+{corpus}"""
 
-**Step 4: Parse and validate**
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--song", required=True)
+    parser.add_argument("--dataset", required=True)
+    args = parser.parse_args()
 
-```python
-import json, anthropic
+    log_path = Path("logs/agent-A-status.md")
+    log_path.parent.mkdir(exist_ok=True)
 
-def validate_lines(lines: list) -> list[str]:
-    """Return list of error strings. Empty list = all good."""
-    errors = []
-    for line in lines:
-        orig_sum = sum(w['syllables'] for w in line['original'])
-        gen_sum  = sum(w['syllables'] for w in line['generated'])
-        if orig_sum != gen_sum:
-            errors.append(
-                f"Line {line['lineIndex']}: original={orig_sum} syllables, "
-                f"generated={gen_sum} syllables — MISMATCH"
-            )
-    return errors
-```
+    annotated = load_lrc(args.song)
+    corpus = Path(f"data/datasets/{args.dataset}.txt").read_text()
 
-**Step 5: Retry loop**
+    log_path.write_text(f"# Agent A run: {args.song} × {args.dataset}\n\n")
+    log_path.open("a").write(f"Loaded {len(annotated)} lines, corpus {len(corpus)} chars\n\n")
 
-```python
-MAX_RETRIES = 3
+    prompt = build_prompt(annotated, corpus)
+    errors = ["initial"]
+    lines = []
 
-for attempt in range(MAX_RETRIES):
-    response = call_claude(prompt)
-    lines = json.loads(response)
-    errors = validate_lines(lines)
-    if not errors:
-        break
-    # Add error feedback to prompt and retry
-    prompt += f"\n\nPREVIOUS ATTEMPT FAILED. Fix these specific lines:\n" + "\n".join(errors)
-    log(f"Attempt {attempt+1} failed: {errors}")
+    for attempt in range(3):
+        try:
+            lines = call_claude(prompt)
+            errors = validate_lines(lines)
+        except Exception as e:
+            errors = [f"Exception: {e}"]
 
-if errors:
-    log("FAILED after 3 attempts — writing partial results")
-    # still write what we have, mark as failed
-```
+        log_path.open("a").write(f"## Attempt {attempt+1}\nErrors: {errors or 'NONE — PASS'}\n\n")
 
-**Step 6: Write output**
+        if not errors:
+            break
 
-```python
-# stdout (for piping)
-print(json.dumps(lines, indent=2))
+        prompt += f"\n\nPREVIOUS ATTEMPT FAILED — fix ONLY these lines, keeping all others:\n" + "\n".join(errors)
 
-# file (for inspection)
-Path(f"scripts/output/{song_id}-{dataset_id}.json").write_text(json.dumps(lines, indent=2))
+    out = Path(f"scripts/output/{args.song}-{args.dataset}.json")
+    out.parent.mkdir(exist_ok=True)
+    out.write_text(json.dumps(lines, indent=2))
+
+    if errors:
+        print(f"FAILED after 3 attempts: {errors}", file=sys.stderr)
+        sys.exit(1)
+
+    print(json.dumps(lines, indent=2))
+
+if __name__ == "__main__":
+    main()
 ```
 
 ### Iteration guidance
 
-Run the script. Look at the output. If syllable matching is failing frequently:
-- Try making the prompt more explicit about the counting step
-- Try asking for chain-of-thought in a scratchpad field (then strip it from output)
-- Try `claude-opus-4-7` if `claude-sonnet-4-5` is struggling (higher cost but better compliance)
+Run the script. Check `logs/agent-A-status.md` after each run. If syllable matching is failing:
+- Try asking for chain-of-thought in a `"scratchpad"` field (then strip from output in `call_claude`)
+- Try reducing batch size — pass 10 lines at a time instead of all 54
+- Try `claude-opus-4-7` if `claude-sonnet-4-5` keeps failing (higher cost, better compliance)
 
-Keep all prompt versions in `scripts/prompt_versions/` with notes on what improved.
+Keep all prompt versions in `scripts/prompt_versions/v1.txt`, `v2.txt`, etc. with a note on what changed.
 
 ### Done when
 
-Run `python scripts/generate.py --song bohemian-rhapsody --dataset ikea-manuals` five times.
-At least 4 of 5 must produce zero syllable mismatches on first attempt (no retries).
-Write all 5 results to `scripts/output/` for the PR.
+Run this 5 times:
+```bash
+python scripts/generate.py --song bohemian-rhapsody --dataset ikea-manuals
+```
+At least 4 of 5 must produce zero syllable mismatches on first attempt (no retries needed).
+Also run once with `--dataset yelp-reviews-1star` to prove it's not tied to one corpus.
+Write all results to `scripts/output/` for the PR.
+
+Verification command:
+```bash
+python3 -c "
+import json, sys
+data = json.load(open('scripts/output/bohemian-rhapsody-ikea-manuals.json'))
+errors = [f'Line {l[\"lineIndex\"]}: {sum(w[\"syllables\"] for w in l[\"original\"])} vs {sum(w[\"syllables\"] for w in l[\"generated\"])}' for l in data if sum(w[\"syllables\"] for w in l['original']) != sum(w['syllables'] for w in l['generated'])]
+print('PASS' if not errors else 'FAIL: ' + str(errors))
+"
+```
 
 ### Commit cadence
 
 ```bash
-# After setup
-git add scripts/ && git commit -m "agent-A: scaffold generate.py" && git push
-
-# After each working version
-git add . && git commit -m "agent-A: prompt v2 — 60% pass rate" && git push
-
-# When done
+git add scripts/ logs/ && git commit -m "agent-A: scaffold generate.py" && git push
+git add . && git commit -m "agent-A: prompt v2 — X/5 pass rate" && git push
 git add . && git commit -m "agent-A: DONE — 5/5 pass, prompt finalized" && git push
 ```
 
 ### PR description must include
 
 - The final prompt (complete, verbatim — Agent C copies it exactly)
-- Pass rate observed across all runs
-- Sample output for 2 different song+dataset combos (paste the full JSON)
-- Which Claude model was used and why
+- Pass rate across all 5+ runs
+- Sample JSON output for bohemian-rhapsody × ikea-manuals AND × yelp-reviews-1star
+- Which model was used and why
 
 ---
 
@@ -369,52 +442,84 @@ This replaces the current fake proportional timing in the karaoke screen.
 git checkout -b agent/B-word-timing
 git push -u origin agent/B-word-timing
 mkdir -p scripts logs data/lrc
+apt-get install -y ffmpeg 2>/dev/null || true   # required by whisper
 pip install openai-whisper yt-dlp
-echo "openai-whisper\nyt-dlp" > scripts/requirements-B.txt
+printf "openai-whisper\nyt-dlp\n" > scripts/requirements-B.txt
 ```
 
-Note: `openai-whisper` downloads model weights on first use (~140MB for `base`, ~460MB for `medium`).
-This is normal. It will be slow the first time, fast after.
+`openai-whisper` requires `ffmpeg` to be installed — without it, transcription will silently fail or crash.
+Model weights download on first use (~140MB for `base`). This is normal; it's cached after the first run.
+
+### LRC file format (what you'll read for the fallback)
+
+`data/lrc/bohemian-rhapsody.json`:
+```json
+{
+  "id": "bohemian-rhapsody",
+  "lines": [
+    { "startMs": 0,    "text": "Is this the real life?" },
+    { "startMs": 2550, "text": "Is this just fantasy?" },
+    { "startMs": 5170, "text": "Caught in a landslide" }
+  ],
+  "durationSeconds": 354
+}
+```
+
+### Song YouTube IDs (from `data/songs.json`)
+
+| Song | youtubeId |
+|------|-----------|
+| bohemian-rhapsody | `fJ9rUzIMcZQ` |
+| never-gonna-give-you-up | `dQw4w9WgXcQ` |
+| africa | `FTQbiNvZqaY` |
+| someone-like-you | `hLQl3WQQoQ0` |
+| dont-stop-believin | `1k8craCGpgs` |
 
 ### Build `scripts/align.py`
 
 ```bash
-python scripts/align.py --youtube-id tAGnKpE4NCI --song bohemian-rhapsody
+# Test network first:
+yt-dlp --simulate "https://www.youtube.com/watch?v=fJ9rUzIMcZQ"
+
+# If that works, run for real:
+python scripts/align.py --song bohemian-rhapsody
 # Produces: data/lrc/bohemian-rhapsody-words.json
 ```
 
-#### Step 1: Download audio
+Complete script:
 
 ```python
-import subprocess, os
+#!/usr/bin/env python3
+import argparse, json, os, re, subprocess, sys
+from pathlib import Path
 
-def download_audio(youtube_id: str, song_id: str) -> str:
+def get_youtube_id(song_id: str) -> str:
+    songs = json.loads(Path("data/songs.json").read_text())
+    for s in songs:
+        if s["id"] == song_id:
+            return s["youtubeId"]
+    raise ValueError(f"Song not found: {song_id}")
+
+def download_audio(youtube_id: str, song_id: str) -> str | None:
     out_path = f"/tmp/{song_id}.mp3"
     if os.path.exists(out_path):
-        return out_path  # already downloaded
-    subprocess.run([
-        "yt-dlp",
-        "-x", "--audio-format", "mp3",
-        "--audio-quality", "0",
-        "-o", out_path,
+        print(f"Using cached audio: {out_path}")
+        return out_path
+    result = subprocess.run([
+        "yt-dlp", "-x", "--audio-format", "mp3",
+        "--audio-quality", "0", "-o", out_path,
         f"https://www.youtube.com/watch?v={youtube_id}"
-    ], check=True)
+    ])
+    if result.returncode != 0:
+        return None
     return out_path
-```
 
-#### Step 2: Transcribe with word timestamps
-
-```python
-import whisper
-
-def transcribe_with_words(audio_path: str) -> list[dict]:
-    """Returns list of {word, start, end} in seconds."""
-    model = whisper.load_model("base")   # use "medium" if accuracy is poor
-    result = model.transcribe(
-        audio_path,
-        word_timestamps=True,
-        language="en"
-    )
+def transcribe_with_whisper(audio_path: str) -> list[dict]:
+    import whisper
+    print("Loading Whisper base model...")
+    model = whisper.load_model("base")
+    print("Transcribing (this takes a few minutes)...")
+    result = model.transcribe(audio_path, word_timestamps=True, language="en")
     words = []
     for segment in result["segments"]:
         for w in segment.get("words", []):
@@ -424,77 +529,115 @@ def transcribe_with_words(audio_path: str) -> list[dict]:
                 "endMs":   int(w["end"]   * 1000),
             })
     return words
+
+def synthetic_timestamps(song_id: str) -> list[dict]:
+    """Fallback: distribute words evenly across each LRC line's time window."""
+    data = json.loads(Path(f"data/lrc/{song_id}.json").read_text())
+    lines = data["lines"]
+    duration_ms = data["durationSeconds"] * 1000
+    words = []
+    for i, line in enumerate(lines):
+        line_start = line["startMs"]
+        line_end = lines[i + 1]["startMs"] if i + 1 < len(lines) else duration_ms
+        line_words = line["text"].split()
+        if not line_words:
+            continue
+        slot = (line_end - line_start) / len(line_words)
+        for j, w in enumerate(line_words):
+            words.append({
+                "word":    w,
+                "startMs": int(line_start + j * slot),
+                "endMs":   int(line_start + (j + 1) * slot),
+            })
+    return words
+
+def spot_check(words: list[dict], song_id: str) -> str:
+    lrc = json.loads(Path(f"data/lrc/{song_id}.json").read_text())
+    report = ["## Spot-check: first word of each LRC line vs expected startMs\n"]
+    report.append("| LRC line | Expected startMs | First whisper word | Whisper startMs | Drift |")
+    report.append("|----------|------------------|--------------------|-----------------|-------|")
+    for line in lrc["lines"][:10]:
+        expected = line["startMs"]
+        first_word_text = line["text"].split()[0].lower().strip(",.!?")
+        # Find nearest word in whisper output
+        match = min(words, key=lambda w: abs(w["startMs"] - expected))
+        drift = match["startMs"] - expected
+        report.append(f'| "{line["text"][:25]}" | {expected} | "{match["word"]}" | {match["startMs"]} | {drift:+d}ms |')
+    return "\n".join(report)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--song", required=True)
+    args = parser.parse_args()
+
+    log = Path("logs/agent-B-status.md")
+    log.parent.mkdir(exist_ok=True)
+    log.write_text(f"# Agent B: {args.song}\n\n")
+
+    youtube_id = get_youtube_id(args.song)
+    log.open("a").write(f"YouTube ID: {youtube_id}\n")
+
+    audio_path = download_audio(youtube_id, args.song)
+    method = "whisper"
+
+    if audio_path:
+        log.open("a").write("yt-dlp: SUCCESS\n")
+        words = transcribe_with_whisper(audio_path)
+    else:
+        log.open("a").write("yt-dlp: FAILED — using synthetic timestamps\n")
+        words = synthetic_timestamps(args.song)
+        method = "synthetic"
+
+    log.open("a").write(f"Method: {method}\nWords extracted: {len(words)}\n\n")
+    log.open("a").write(spot_check(words, args.song))
+
+    out = {"songId": args.song, "method": method, "words": words}
+    out_path = Path(f"data/lrc/{args.song}-words.json")
+    out_path.write_text(json.dumps(out, indent=2))
+    print(f"Wrote {len(words)} words to {out_path} (method={method})")
+
+if __name__ == "__main__":
+    main()
 ```
-
-#### Step 3: Write output
-
-Output format — do not change this schema after your PR is open (Agent D depends on it):
-
-```python
-import json
-from pathlib import Path
-
-def write_output(song_id: str, words: list[dict]):
-    data = {"songId": song_id, "words": words}
-    path = Path(f"data/lrc/{song_id}-words.json")
-    path.write_text(json.dumps(data, indent=2))
-    print(f"Wrote {len(words)} words to {path}")
-```
-
-Final output example:
-```json
-{
-  "songId": "bohemian-rhapsody",
-  "words": [
-    { "word": "Is",   "startMs": 4210, "endMs": 4420 },
-    { "word": "this", "startMs": 4420, "endMs": 4590 },
-    { "word": "the",  "startMs": 4590, "endMs": 4680 },
-    { "word": "real", "startMs": 4680, "endMs": 4950 },
-    { "word": "life", "startMs": 4950, "endMs": 5180 }
-  ]
-}
-```
-
-#### Step 4: Spot-check
-
-After generating, write a spot-check report comparing timestamps to known LRC line starts.
-Example: LRC says line "Is this the real life?" starts at ~4200ms.
-Whisper's first word "Is" should start near 4200ms. If it's off by more than 500ms, try `medium` model.
 
 ### Accuracy notes
 
-- `base` model: fast, ~60% word accuracy, timing within ~100ms — good enough for v1
-- `medium` model: slow (~3x), ~80% word accuracy, timing within ~50ms — better
-- Start with `base`. If spot-check shows >500ms drift, rerun with `medium`.
-- CPU inference on `medium` for a 6-minute song takes ~30-60 minutes. This is fine overnight.
+- `base` model: fast (~5 min on CPU), ~60% word accuracy, timing within ~200ms — acceptable for v1
+- `medium` model: slow (~30-60 min on CPU), ~80% word accuracy, timing within ~50ms
+- Start with `base`. Check spot-check table in `logs/agent-B-status.md`. If drift > 500ms consistently, rerun with `medium` (change `load_model("base")` to `load_model("medium")`).
+- Synthetic timestamps are a last resort — they give correct word order but fake timing. Document clearly if used.
 
-### If yt-dlp fails (network/YouTube block)
+### Done when
 
-Some cloud environments block YouTube. Test first:
+`data/lrc/bohemian-rhapsody-words.json` exists with at least 200 words.
+
+Verification:
 ```bash
-yt-dlp --simulate https://www.youtube.com/watch?v=tAGnKpE4NCI
+python3 -c "
+import json
+data = json.load(open('data/lrc/bohemian-rhapsody-words.json'))
+words = data['words']
+print(f'Total words: {len(words)}')
+print(f'Method: {data[\"method\"]}')
+print('First 5:', [(w[\"word\"], w[\"startMs\"]) for w in words[:5]])
+print('At t=10s:', [w[\"word\"] for w in words if 9000 < w[\"startMs\"] < 11000])
+"
 ```
-If it fails, write this to your status log. Then generate SYNTHETIC timestamps as a fallback:
-```python
-# Fallback: space words evenly within each LRC line's time window
-# Load data/lrc/bohemian-rhapsody.json, distribute words across each line's duration
-```
-Document which approach you used in the PR.
 
 ### Commit cadence
 
 ```bash
 git add . && git commit -m "agent-B: setup + yt-dlp test" && git push
-git add . && git commit -m "agent-B: base model done, spot-check OK" && git push
+git add . && git commit -m "agent-B: whisper done, spot-check written" && git push
 git add . && git commit -m "agent-B: DONE — words written for bohemian-rhapsody" && git push
 ```
 
 ### PR description must include
 
-- Which Whisper model you used and why
-- Spot-check table: 10 words with timestamps vs expected timing (from LRC lines)
-- Whether yt-dlp worked or fallback was needed
-- The word JSON for at least the first 60 seconds of bohemian-rhapsody
+- Which method: whisper (base/medium) or synthetic — and why
+- Spot-check table from `logs/agent-B-status.md`
+- First 20 words of the output JSON
+- Total word count
 
 ---
 
@@ -520,33 +663,143 @@ git push -u origin agent/C-api-route
 mkdir -p app/api/generate logs
 ```
 
+### Data the route reads (server-side file reads — not client)
+
+- `data/lrc/<songId>.json` — same format as Agent A uses (see Agent A section for schema)
+- `data/datasets/<datasetId>.txt` — plain text corpus
+
+The route must read these files at request time using `fs.readFileSync` or `fs/promises`.
+These are static files in the repo, not fetched over HTTP.
+
 ### Build `app/api/generate/route.ts`
 
-- `POST /api/generate` accepts `{ songId, datasetId, bustCache }`
-- Copy Agent A's final prompt **verbatim** — do not rewrite or improve it
-- Validate every line: `sum(generated.syllables) === syllableCount`, zero tolerance
-- Retry up to 3 times on any mismatch
-- `ANTHROPIC_API_KEY` from `process.env.ANTHROPIC_API_KEY` only — never log or return it
-- Return `{ lines: LyricLine[] }` on 200, `{ error: string }` on 500
-- Cache check: if `bustCache` is false, check localStorage key `lyrics_<songId>_<datasetId>` first (this is client-side; server just ignores `bustCache: false` — caching is handled by the client)
+Use this skeleton — fill in `buildPrompt()` with Agent A's final prompt verbatim:
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server';
+import Anthropic from '@anthropic-ai/sdk';
+import fs from 'fs';
+import path from 'path';
+import { LyricLine } from '@/app/types';
+
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+function loadLrc(songId: string) {
+  const p = path.join(process.cwd(), 'data', 'lrc', `${songId}.json`);
+  const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+  // Annotate with syllable counts using the same logic as Agent A
+  // (copy count_syllables logic or use a JS syllable library)
+  return data.lines.map((line: { startMs: number; text: string }, i: number) => ({
+    lineIndex: i,
+    startMs: line.startMs,
+    text: line.text,
+    // syllableCount computed here from splitting line.text
+  }));
+}
+
+function loadCorpus(datasetId: string): string {
+  const p = path.join(process.cwd(), 'data', 'datasets', `${datasetId}.txt`);
+  return fs.readFileSync(p, 'utf8');
+}
+
+function buildPrompt(annotatedLines: object[], corpus: string): string {
+  // PASTE AGENT A'S FINAL PROMPT VERBATIM HERE
+  // Replace {annotated_lyrics_json} and {corpus_text} with the actual values
+  throw new Error('buildPrompt not implemented — paste Agent A prompt here');
+}
+
+function validateLines(lines: LyricLine[]): string[] {
+  return lines
+    .filter(line => {
+      const origSum = line.original.reduce((s, w) => s + w.syllables, 0);
+      const genSum  = line.generated.reduce((s, w) => s + w.syllables, 0);
+      return origSum !== genSum;
+    })
+    .map(line => {
+      const o = line.original.reduce((s, w) => s + w.syllables, 0);
+      const g = line.generated.reduce((s, w) => s + w.syllables, 0);
+      return `Line ${line.lineIndex}: original=${o}, generated=${g}`;
+    });
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const { songId, datasetId } = await req.json();
+    if (!songId || !datasetId) {
+      return NextResponse.json({ error: 'songId and datasetId required' }, { status: 400 });
+    }
+
+    const annotatedLines = loadLrc(songId);
+    const corpus = loadCorpus(datasetId);
+    let prompt = buildPrompt(annotatedLines, corpus);
+    let lines: LyricLine[] = [];
+    let errors: string[] = ['initial'];
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const msg = await client.messages.create({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 8192,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      const text = (msg.content[0] as { text: string }).text
+        .replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
+      lines = JSON.parse(text);
+      errors = validateLines(lines);
+      if (!errors.length) break;
+      prompt += `\n\nPREVIOUS ATTEMPT FAILED. Fix ONLY these lines:\n${errors.join('\n')}`;
+    }
+
+    if (errors.length) {
+      return NextResponse.json({ error: `Syllable mismatch after 3 attempts: ${errors.join('; ')}` }, { status: 500 });
+    }
+
+    return NextResponse.json({ lines });
+  } catch (err) {
+    console.error('/api/generate error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+```
+
+For syllable counting in TypeScript, install `npm install syllable` and use:
+```typescript
+import { syllable } from 'syllable';
+// syllable('fantasy') === 3
+```
 
 ### Verify
 
 ```bash
 npm run dev &
-sleep 5
+sleep 8
 curl -s -X POST http://localhost:3000/api/generate \
   -H "Content-Type: application/json" \
   -d '{"songId":"bohemian-rhapsody","datasetId":"ikea-manuals"}' \
-  | python3 -m json.tool | head -50
+  | python3 -m json.tool | head -60
 ```
 
-Run 3 times. All must return valid syllable-matched JSON.
+Run 3 times. All must return `{ lines: [...] }` with zero syllable mismatches.
+
+Validate the response:
+```bash
+curl -s -X POST http://localhost:3000/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{"songId":"bohemian-rhapsody","datasetId":"ikea-manuals"}' \
+  | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+lines = data.get('lines', [])
+errors = [f'Line {l[\"lineIndex\"]}' for l in lines if sum(w['syllables'] for w in l['original']) != sum(w['syllables'] for w in l['generated'])]
+print('PASS' if not errors else 'FAIL: ' + str(errors))
+print(f'{len(lines)} lines returned')
+"
+```
 
 ### PR description must include
 
-- Sample curl output
-- Confirmation that ANTHROPIC_API_KEY does not appear in any response or log
+- Sample curl output (first 20 lines of JSON)
+- Verification script output showing PASS
+- Confirmation ANTHROPIC_API_KEY does not appear in any response or log
 
 ---
 
@@ -563,26 +816,62 @@ Replace the fake proportional word-timing in the karaoke screen with real timest
 
 ### What to change
 
-`app/ui/v1/KaraokeScreen.tsx` — timing logic only:
+The active karaoke component is **`app/components/KaraokeScreen.tsx`** — this is what `app/page.tsx` imports and what runs in the browser.
+
+The component currently uses `MOCK_LYRICS` hardcoded at the top of the file and fake proportional timing. You need to:
+
+1. **Wire up real lyrics from `/api/generate`** — the `GeneratingScreen` already calls `onDone(lyrics)` which passes `LyricLine[]` to `KaraokeScreen` via `app/page.tsx`. The `lyrics` prop is already there; just remove the `MOCK_LYRICS` fallback and use `props.lyrics` directly.
+
+2. **Replace fake timing with Agent B's word timestamps** — load `data/lrc/<songId>-words.json` at component mount and use those timestamps to drive `highlightedWordIndex`:
 
 ```typescript
-// OLD: fake proportional timing
-const wordStartMs = (cumSylsBeforeWord / totalSyls) * lineDuration;
+// Add to KaraokeScreen, after component mounts:
+const [wordTimings, setWordTimings] = useState<{word: string; startMs: number; endMs: number}[]>([]);
 
-// NEW: real timestamps from Agent B's output
-// Load data/lrc/<songId>-words.json
-// Map each generated word to its { startMs, endMs }
-// highlightedWordIndex = words.findIndex(w => currentMs >= w.startMs && currentMs < w.endMs)
+useEffect(() => {
+  fetch(`/data/lrc/${song.id}-words.json`)
+    .then(r => r.json())
+    .then(data => setWordTimings(data.words))
+    .catch(() => {}); // graceful fallback — component works without it
+}, [song.id]);
+
+// Then in the RAF/interval loop, replace proportional highlighting with:
+// const activeWord = wordTimings.find(w => currentMs >= w.startMs && currentMs < w.endMs);
+// Use activeWord?.word to match against the generated word currently being rendered
 ```
 
-Do not change any visual design — only the timing source.
-The file ownership table says you may touch `app/ui/v1/` for this one purpose.
+Do not change any visual design — only remove MOCK_LYRICS and fix the timing source.
+
+### How matching works
+
+The generated words are different text from the original, but they map 1-to-1 by syllable count. Agent B's word timestamps are from the ORIGINAL song audio. So you match by position: the Nth generated word is highlighted when the Nth original word's timestamp is active.
+
+Track a running word index across all lines:
+```typescript
+// Build a flat array of original word timestamps across all lines
+// wordsFlat[i] = { startMs, endMs } from Agent B's output, in order
+// Then: highlightedFlatIndex = wordsFlat.findIndex(w => currentMs >= w.startMs && currentMs < w.endMs)
+// Map flatIndex back to (lineIndex, wordIndex) for rendering
+```
 
 ### Verify
 
-Load bohemian-rhapsody. At `currentMs = 4210`, "Is" must be highlighted.
-At `currentMs = 4680`, "real" must be highlighted.
-These timestamps come from Agent B's output file — use them exactly.
+```bash
+npm run dev
+# Open http://localhost:3000
+# Pick bohemian-rhapsody + any dataset
+# Wait for generation, then on karaoke screen:
+# - Check browser console for any errors
+# - Verify words highlight as time advances
+# - At t=0ms, first word "Is"/"Fix" must be highlighted
+```
+
+Unit-level check (paste into browser console on karaoke screen):
+```javascript
+// Should log the word active at t=4210ms
+console.log(window.__wordTimings?.find(w => 4210 >= w.startMs && 4210 < w.endMs))
+```
+(Add `window.__wordTimings = wordTimings` in the component for this to work during dev.)
 
 ---
 
