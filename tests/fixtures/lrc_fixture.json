@@ -1,0 +1,11 @@
+{
+  "id": "test-song",
+  "trackName": "Test Song",
+  "artistName": "Test Artist",
+  "durationSeconds": 60,
+  "lines": [
+    {"startMs": 0,    "text": "Is this the real life"},
+    {"startMs": 4000, "text": "Is this just fantasy"},
+    {"startMs": 8000, "text": "No escape from reality"}
+  ]
+}
