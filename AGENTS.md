@@ -1,34 +1,32 @@
-# AI Karaoke — Agent Guide (human-controlled)
+# AI Karaoke — Cursor agent guide
 
-This repo is maintained **with a human in the loop**. Agents assist; they do not run unattended overnight builds or parallel swarms.
+Human-in-the-loop development: you assist with focused, reviewable work; the user directs scope, commits, and PRs.
 
-## Current state
+## Before coding
 
-- **Docs only** — authoritative specs in `docs/`. No `app/`, no `package.json`, no `scripts/`.
-- **Seed data** — `data/` holds catalog JSON/LRC for when the app is scaffolded.
+1. Read **`docs/`** — especially `SDD.md`, `API.md`, `UX.md`
+2. Read **`.cursor/rules/ai-karaoke-context.mdc`** — v1 scope and repo layout
+3. Inspect **`data/`** — songs, datasets, LRC files to wire into the app
 
-## Source of truth
+## v1 scope (locked)
 
-Read before coding:
-
-| Doc | Purpose |
-|-----|---------|
-| `docs/SDD.md` | Architecture and data design |
-| `docs/API.md` | `/api/generate` contract and prompts |
-| `docs/UX.md` | Screens, layout, syllable grid |
-| `docs/SRS.md` | Requirements by version |
-| `docs/CHARTER.md` | Goals and version roadmap |
-
-Party-room / Supabase / voting specs (if archived) live under `docs/archive/` — **v2 only**, not v1 work.
+- **One device** (laptop or TV): picker → generating → karaoke
+- YouTube IFrame API for audio; AI lyric rewrite via `/api/generate`
+- `localStorage` cache: `lyrics_<songId>_<datasetId>`
+- **Out of scope unless the user asks:** rooms, guest phones, Supabase, voting (see `docs/SRS.md` for future requirements)
 
 ## Working rules
 
-1. **No autonomous overnight sessions** — no `logs/`, no agent status commits, no pre-flight automation.
-2. **One branch at a time** — small, reviewable changes; open a PR when the user asks.
-3. **Commit only when the user asks** — never push secrets (`.env`, `.env.local`).
-4. **Do not add** `logs/`, `scripts/output/`, or `__pycache__/` to the repo.
-5. **Minimize scope** — docs and seed data unless the user expands scope to scaffold the app.
+1. **Human-in-the-loop** — no unattended overnight runs, status churn, or coordination commits; no `logs/` in the repo
+2. **One branch at a time** — small diffs; open a PR when the user asks
+3. **Commit only when the user asks** — never commit `.env` or `.env.local`
+4. **Minimize scope** — match the request; scaffold the Next.js app only when asked
+5. **Do not add** `logs/`, `scripts/output/`, or `__pycache__/`
 
-## When scaffolding the app
+## Next.js
 
-Follow `docs/SDD.md`, `docs/API.md`, and `docs/UX.md`. v1: single device, picker → generating → karaoke, YouTube IFrame API, `localStorage` cache for generated lyrics.
+When upgrading or scaffolding, check `node_modules/next/dist/docs/` for breaking changes in the installed version.
+
+## Scaffolding the app
+
+Follow `docs/SDD.md`, `docs/API.md`, and `docs/UX.md`. Build order: scaffold → `/api/generate` → screens → YouTube sync → deploy on Vercel.

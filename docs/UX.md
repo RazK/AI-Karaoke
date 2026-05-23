@@ -226,7 +226,7 @@ v1 has three screens: **Picker → Generating → Karaoke**
 - **Auto-scroll:** the view automatically scrolls to keep the active line centered. If the user manually scrolls, auto-scroll pauses and resumes after 3 seconds of inactivity.
 
 **Word-level highlight:**
-Within the active line, the word currently being sung is highlighted in amber (`#FCD34D`) with a soft golden glow. In v1, timing is syllable-proportional: `(word.syllables / totalSyllables) × lineDurationMs`. After Agent B delivers word timestamps, timing switches to real per-word `startMs`/`endMs` values.
+Within the active line, the word currently being sung is highlighted in amber (`#FCD34D`) with a soft golden glow. In v1, timing is syllable-proportional: `(word.syllables / totalSyllables) × lineDurationMs`. When `data/lrc/<id>-words.json` exists, use per-word `startMs`/`endMs` instead.
 
 **Bottom bar (fixed):**
 - **▶/❚❚ button** — toggles play/pause

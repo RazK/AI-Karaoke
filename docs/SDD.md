@@ -75,8 +75,8 @@ data/datasets.json        — [{ id, label, description }]
 data/datasets/<id>.txt    — plain text corpus (loaded by /api/generate at request time)
 data/lrc/<id>.json        — { id, trackName, artistName, durationSeconds,
                                lines: [{ startMs, text }] }
-data/lrc/<id>-words.json  — { songId, method, words: [{ word, startMs, endMs }] }
-                            (built by Agent B — does not exist until Agent B runs)
+data/lrc/<id>-words.json  — optional; { songId, method, words: [{ word, startMs, endMs }] }
+                            when present, enables word-level karaoke timing
 ```
 
 `data/lrc/<id>.json` has only `startMs` and the raw text per line. **Syllable annotation happens at runtime** — the API route splits each line's text into words and counts syllables on the fly using `pyphen` (Python) or the `syllable` npm package (TypeScript). The syllable data is never stored in the static files.

@@ -1,0 +1,32 @@
+---
+description: AI Karaoke v1 — specs, seed catalog, and build guidance
+alwaysApply: true
+---
+
+# AI Karaoke — project context
+
+This repository holds the **AI Karaoke v1** specification and seed catalog for a single-device party karaoke web app.
+
+## What is in this repo
+
+- **`docs/`** — product and engineering specs: architecture (`SDD.md`), API (`API.md`), UX (`UX.md`), requirements (`SRS.md`), goals (`CHARTER.md`). Read these before implementing.
+- **`data/`** — seed catalog: songs, datasets, corpus text, line LRC timing (`data/lrc/*.json`), and word-level timing when present (`*-words.json`).
+
+Describe what **is** here and what **to build** — not gaps or past state.
+
+## v1 product (locked)
+
+- **One device** in the room (laptop or TV) — picker → generating → karaoke.
+- AI rewrites lyrics **syllable-for-syllable** from an absurd text source (IKEA manuals, Yelp reviews, etc.).
+- **YouTube IFrame API** for audio and sync; generated lyrics cached in `localStorage`.
+- **Out of scope for v1:** rooms, guest phones, Supabase, voting (future requirements in `docs/SRS.md`).
+
+## When building the app
+
+Scaffold **Next.js App Router** on Vercel, then implement per specs:
+
+1. Architecture and data wiring — `docs/SDD.md`
+2. `/api/generate` — `docs/API.md`
+3. Screens and syllable grid — `docs/UX.md`
+
+Human-in-the-loop workflow: see `AGENTS.md`. Commit only when the user asks.

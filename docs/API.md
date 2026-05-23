@@ -121,7 +121,7 @@ Output format:
 
 ### Model
 
-`claude-sonnet-4-5`. Syllable constraint compliance requires this capability level. See `AGENTS.md § Agent A` for the finalized model choice after testing.
+`claude-sonnet-4-5`. Syllable constraint compliance requires this capability level.
 
 ---
 
