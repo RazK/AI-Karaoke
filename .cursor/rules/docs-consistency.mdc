@@ -1,0 +1,53 @@
+---
+description: Docs and code stay in sync before commits; human-first docs, no duplication
+alwaysApply: true
+---
+
+# Docs ↔ code consistency
+
+**Before any commit:** every behavior, contract, or architectural change in the diff must be reflected in the right `docs/` file (or the doc updated to match the code). No undocumented changes ship.
+
+## Audience
+
+| Reader | Needs |
+|--------|--------|
+| **Humans** | Short, scannable intent — what, why, and where to look. Impatient. |
+| **Agents** | Full detail from **code + `docs/` contracts**. Patient; do not mirror code in prose. |
+
+Docs serve **humans first**. If a human cannot get value faster than reading the code, **drop or shorten** the doc — do not duplicate.
+
+## Document this (in `docs/`)
+
+- Product intent, v1 scope, locked decisions
+- API contracts (`docs/API.md`) — request/response shapes, env vars, error behavior
+- UX behavior humans care about (`docs/UX.md`) — screens, flows, layout rules not obvious from components
+- Architecture choices (`docs/SDD.md`) — stack, data model, deployment, sync strategy
+- Requirements and roadmap (`docs/SRS.md`, `docs/CHARTER.md`) when scope shifts
+
+## Do not document (code is enough)
+
+- Implementation steps obvious from file/function names
+- Type fields already defined in `app/types.ts` or route handlers
+- “How to run npm install” once README covers scaffold setup
+- Comments in code that repeat the same sentence in `docs/`
+
+One source of truth per fact: **contract in docs, implementation in code** — not both in full.
+
+## Pre-commit checklist (agents)
+
+1. List what changed in behavior, API, UX, or architecture.
+2. Map each item to a doc file — update that file in the **same commit**, or revert the code change.
+3. Scan the diff for new prose: remove duplication with code; tighten for human scanability.
+4. `README.md` — entry point only; link to `docs/`, do not grow into a second spec.
+
+## Where specs live
+
+| Change type | Update |
+|-------------|--------|
+| Route, prompt, validation | `docs/API.md` |
+| Screen, layout, interaction | `docs/UX.md` |
+| Stack, data, timing, deploy | `docs/SDD.md` |
+| Scope / v2 ideas | `docs/SRS.md` |
+| Onboarding, build order | `README.md` |
+
+When in doubt: **update the contract doc, keep code self-explanatory, delete redundant prose.**
