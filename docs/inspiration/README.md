@@ -1,20 +1,23 @@
 # UX inspiration
 
-Open **`moodboard.html`** in a browser to review references and mocks.
+Visual appendix for [`docs/UX.md`](../UX.md). Open **`moodboard.html`** in a browser.
 
-## Current status
+## Primary mock
 
-- **Direction B (party game):** leading candidate — `mock-b-refined-v2-trio.png`
-- **Direction C (terminal catalog):** leading candidate — `mock-c-refined-trio.png`
-- Pick **one** before Next.js scaffold; do not ship a hybrid.
+**`mock-b-refined-v2-trio.png`** — picker, generating, and karaoke layouts to implement toward.
 
-## Files
+## Supporting assets
 
-| File | What |
+| File | Role |
 |---|---|
-| `01-jackbox-*.png`, `02-jackbox-*.png` | Real Jackbox references |
-| `03-mschf-*.png` | Real MSCHF catalog reference |
-| `mock-*-trio.png` | AI exploration mocks (Picker → Generating → Karaoke) |
-| `moodboard.html` | Gallery — start here |
+| `moodboard.html` | Gallery page |
+| `01-jackbox-quiplash.png` | Party-game brand reference |
+| `02-jackbox-gameplay-tv.png` | TV typography reference |
+| `03-mschf-catalog.png` | Catalog humor / monospace tone reference |
+| `mock-c-refined-trio.png` | Flavor text and status-line tone |
+| `mock-classic-karaoke.png` | Syllable highlight reference |
 
-Early mocks (`mock-jackbox-neon-trio`, `mock-mschf-brutalist-trio`, etc.) kept for history; superseded by refined versions.
+## Sharing for feedback
+
+- Send PNG links from GitHub (blob view works in any browser)
+- Or deploy this folder statically (Netlify Drop, GitHub Pages) so `moodboard.html` loads with images
