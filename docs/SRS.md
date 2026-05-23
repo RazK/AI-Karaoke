@@ -194,3 +194,51 @@ Guests join from their phones via QR code or room code. No account required. Opt
 - Host sees a "Greatest Hits" catalog: all combos played on this device, sorted by average rating
 - Host can replay any past combo (uses cached lyrics)
 - Combos catalog is stored per-device in localStorage
+
+---
+
+## 5. Future directions (not versioned)
+
+Items below are **potential features**, not scheduled releases. They may ship before, after, or alongside v2/v3 depending on what the party needs. Do not assume a version number.
+
+### 5.1 Bring your own song (YouTube URL)
+
+Host pastes any embeddable YouTube video instead of picking from the fixed catalog.
+
+**Why this needs backend work (unlike v1):**
+- Download or analyze audio server-side (yt-dlp, ffmpeg)
+- Run speech-to-text / alignment (Whisper-class) to build line + word timings — no pre-made `data/lrc/` file
+- Cache by `youtubeId` so the same video is not re-processed every session
+- Validate embeddability and duration before promising karaoke
+
+**Rough pipeline:**
+```
+YouTube URL → fetch audio → WhisperX → lrc + words JSON → (optional) generate lyrics → play
+```
+
+Long-running jobs; not a single Vercel click. Expect a **worker + queue + storage** when this ships.
+
+### 5.2 Bring your own text
+
+Host pastes or uploads a custom corpus instead of choosing a preset dataset.
+
+**Needs:**
+- Store corpus text server-side (or session-scoped) with size limits
+- Same generate contract as v1 — syllable-matched rewrite from `(original lyrics, user text)`
+- Optional: save named corpora for reuse
+
+**Lighter than 5.1** if the song already has timings (catalog or cached from a prior 5.1 run).
+
+### 5.3 How this relates to v2 / v3
+
+| Track | Examples | v1 |
+|---|---|---|
+| **Party features** (v2, v3) | Phones, voting, ratings, history | Out of scope |
+| **Content features** (§5.1, §5.2) | Any YouTube song, custom text | Out of scope |
+| **Core loop** (v1) | Fixed catalog, fixed datasets, one device | **Current** |
+
+Tracks are independent — e.g. BYO song (§5.1) could ship without phones (v2).
+
+### 5.4 v1 should not block this
+
+v1 types and APIs should treat song lyrics and corpus as **inputs**, not hardcoded paths under `data/`. Timing JSON schema should work for any song, not only the seed catalog. See `docs/SDD.md` for the current static layout.
