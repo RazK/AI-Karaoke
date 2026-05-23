@@ -45,10 +45,12 @@ That's it. Agents handle everything else.
 ```bash
 echo "=== PRE-FLIGHT ===" > logs/agent-STATUS.md
 
-# 1. API key
+# 1. API key — load from .env.local if not already in environment
+if [ -z "$ANTHROPIC_API_KEY" ] && [ -f ".env.local" ]; then
+  export ANTHROPIC_API_KEY=$(grep ANTHROPIC_API_KEY .env.local | cut -d= -f2-)
+fi
 if [ -z "$ANTHROPIC_API_KEY" ]; then
-  echo "FATAL: ANTHROPIC_API_KEY is not set." >> logs/agent-STATUS.md
-  echo "User must add it to environment settings before restarting."  >> logs/agent-STATUS.md
+  echo "FATAL: ANTHROPIC_API_KEY is not set and .env.local not found." >> logs/agent-STATUS.md
   git add logs/ && git commit -m "agent: STOPPED — ANTHROPIC_API_KEY missing" && git push
   exit 1
 fi
