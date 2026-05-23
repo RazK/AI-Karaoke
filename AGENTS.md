@@ -148,7 +148,8 @@ git push -u origin agent/A-lyric-generation
 | `data/lrc/` | Agent B adds `*-words.json` | read-only |
 | `data/songs.json`, `data/datasets.json` | all agents read | do not modify |
 | `app/ui/v1/` | frozen | ❌ DO NOT TOUCH |
-| `app/components/` | frozen | ❌ DO NOT TOUCH |
+| `app/components/KaraokeScreen.tsx` | Agent D (timing logic only) | read-only for others |
+| `app/components/` (rest) | frozen | ❌ DO NOT TOUCH |
 | `app/types.ts` | any agent may ADD optional fields | never remove/rename |
 | `logs/` | your agent writes here | do not delete others' logs |
 | `docs/` | read freely; do not modify | — |

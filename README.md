@@ -16,14 +16,18 @@ Party karaoke where Claude rewrites every lyric line syllable-for-syllable using
 | Layer | Choice |
 |---|---|
 | Frontend | Next.js (App Router), Tailwind CSS |
-| AI | Claude API (`claude-sonnet-4`) via Vercel serverless |
+| AI | Claude API (`claude-sonnet-4-5`) via Vercel serverless |
 | Audio | YouTube IFrame API |
-| Lyric timing | LRCLib + `lrc-kit` |
+| Lyric timing | Static JSON (`data/lrc/`) + `openai-whisper` for word timestamps |
 | Hosting | Vercel |
 
-## Setup
+## Local setup
 
-> Setup instructions will be added once the Next.js project is initialized.
+```bash
+npm install
+cp .env.local.example .env.local   # add ANTHROPIC_API_KEY
+npm run dev
+```
 
 Environment variables (`.env.local`):
 ```
@@ -39,4 +43,5 @@ ANTHROPIC_API_KEY=
 | [`docs/SDD.md`](docs/SDD.md) | System architecture, data design, component design |
 | [`docs/API.md`](docs/API.md) | API routes and Claude prompt strategy |
 | [`docs/UX.md`](docs/UX.md) | Design system, all screens, syllable grid spec |
-| [`CLAUDE.md`](CLAUDE.md) | AI agent working context and build phases |
+| [`CLAUDE.md`](CLAUDE.md) | AI agent working context |
+| [`AGENTS.md`](AGENTS.md) | Multi-agent build plan — branches, ownership, done criteria |

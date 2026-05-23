@@ -13,7 +13,7 @@ Party karaoke app. Read `docs/SDD.md` for architecture, `docs/API.md` for endpoi
 - **Frontend:** Next.js (App Router) on Vercel
 - **Backend:** Single Vercel serverless function at `app/api/generate/route.ts` — Claude API proxy; key stays server-side
 - **Audio:** YouTube IFrame API — embedded on the karaoke screen; each song has a `youtubeId` in `songs.json`
-- **Timing:** Per-word timestamps from WhisperX alignment (`data/lrc/<songId>-words.json`)
+- **Timing:** Per-word timestamps from `openai-whisper` alignment (`data/lrc/<songId>-words.json`)
 - **State:** React state + localStorage
 - **Cache:** Generated lyrics stored in localStorage under `lyrics_<songId>_<datasetId>`
 - **Catalog:** Static JSON files (`data/songs.json`, `data/datasets.json`, `data/lrc/*.json`)

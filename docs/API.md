@@ -44,7 +44,7 @@ Set `bustCache: true` when the host taps Regenerate — forces a new Claude call
 ```
 
 **Server behavior**
-1. Load syllable-annotated lyrics from `data/lrc/<songId>.json`
+1. Load `data/lrc/<songId>.json` — split each line's `text` into words and compute syllable counts at runtime (not pre-stored in the file)
 2. Load dataset corpus from `data/datasets/<datasetId>.txt`
 3. Build prompt and call Claude API (see Prompt Strategy below)
 4. Validate syllable counts on every returned line:
@@ -65,7 +65,7 @@ Served as static files — no API route needed.
 |---|---|
 | `/data/songs.json` | `[{ id, title, artist, youtubeId, durationSeconds, lineCount }]` |
 | `/data/datasets.json` | `[{ id, label, description }]` |
-| `/data/lrc/<id>.json` | `{ lines: [{ startMs, text, syllables: [{ word, count }] }] }` |
+| `/data/lrc/<id>.json` | `{ id, trackName, artistName, durationSeconds, lines: [{ startMs, text }] }` — syllables are computed at runtime, not stored |
 
 ---
 
@@ -121,7 +121,7 @@ Output format:
 
 ### Model
 
-`claude-sonnet-4` (`claude-sonnet-4-20250514`). Syllable constraint compliance requires this model.
+`claude-sonnet-4-5`. Syllable constraint compliance requires this capability level. See `AGENTS.md § Agent A` for the finalized model choice after testing.
 
 ---
 

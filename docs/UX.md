@@ -189,25 +189,26 @@ v1 has three screens: **Picker → Generating → Karaoke**
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  🎵 Bohemian Rhapsody × 📋 IKEA Manuals   [Regenerate] [New]    │  ← top bar
+│  🎵 Bohemian Rhapsody × 📋 IKEA Manuals   [Regenerate] [New]    │  ← top bar (fixed)
 ├──────────────────────────────────────────────────────────────────┤
-│                                            [YouTube ~200×120px]  │
 │                                                                  │
-│  ── previous line (20% opacity) ──────────────────────────────  │
-│  [prev generated…]                                               │
-│  [prev original…]                                                │
+│  Check   the   di-a-gram  care-ful-ly      ← past line, muted   │
+│  No      es-   cape       from  re-al-i-ty                      │
 │                                                                  │
-│  ══ CURRENT LINE ════════════════════════════════════════════    │
-│  Fix     the     shelf    right    now                           │  52px bold white
-│  Is      this    the      real     life                          │  22px gray
-│  ░░░░░░░░░░░░ violet glow bar (highlight token) ░░░░░░░░░░░░░░░  │
+│  ══════════════════════════════════════════════════════════════  │
+│  Fix     the   shelf      right  now        ← ACTIVE line        │  52px bold, glow
+│  Is      this  the        real   life                            │  22px gray
+│  ░░░░[word highlight — amber glow]░░░░░░░░░░░░░░░░░░░░░░░░░░░░  │
+│  ══════════════════════════════════════════════════════════════  │
 │                                                                  │
-│  ── next line (40% opacity) ───────────────────────────────── ─ │
-│  [next generated…]                                               │
-│  [next original…]                                                │
+│  Tigh-   ten   all        the    four  bolts ← next line, muted  │
+│  Is      this  just       fan-   ta-   sy                        │
+│                                                                  │
+│  O-      pen   your       eyes   ← further lines, more muted     │
+│  ...                                                             │
 │                                                                  │
 ├──────────────────────────────────────────────────────────────────┤
-│  ████████████████░░░░░░░░░░░░░░░░░░░░░░   2:14 / 5:54           │  ← progress bar
+│  [▶/❚❚]  ████████████████░░░░░░░░░░░░░  2:14 / 5:54  [YouTube]  │  ← bottom bar (fixed)
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -215,25 +216,28 @@ v1 has three screens: **Picker → Generating → Karaoke**
 - Left: song × dataset label with emoji icons
 - Right: **Regenerate** (ghost, small) + **New Combo** (ghost, small)
 
-**YouTube player:**
-- Always visible per YouTube ToS
-- Positioned top-right, ~200×120px, clear of the lyric display
+**Lyrics area (scrollable):**
+- All lyric lines are rendered in a vertically scrollable list — the full song is visible by scrolling
+- The active line has full opacity and a left-side violet glow bar accent
+- Lines before the active: progressively dimmer as they recede (previous = 60% opacity, earlier = 30%)
+- Lines after the active: slightly dimmed (70% opacity) — upcoming, not forgotten
+- Active line slides into focus: 300ms ease-out (`translateY(16px) → 0, opacity 0.6 → 1`)
+- Font: 52px generated / 22px original for the active line; proportionally smaller for context lines
+- **Auto-scroll:** the view automatically scrolls to keep the active line centered. If the user manually scrolls, auto-scroll pauses and resumes after 3 seconds of inactivity.
 
-**Before Play:**
-- YouTube player is loaded but paused
-- Large **▶ Play** button overlays the lyric area
-- Tapping Play calls `player.playVideo()` and starts the RAF timing loop simultaneously
+**Word-level highlight:**
+Within the active line, the word currently being sung is highlighted in amber (`#FCD34D`) with a soft golden glow. In v1, timing is syllable-proportional: `(word.syllables / totalSyllables) × lineDurationMs`. After Agent B delivers word timestamps, timing switches to real per-word `startMs`/`endMs` values.
 
-**Line display:**
-- 3 lyric units: previous (20% opacity), current (full opacity + violet glow bar), next (40% opacity)
-- When the active line changes, the incoming block slides up from below over 300ms ease-out (`translateY(32px) → 0, opacity 0.3 → 1`)
-- Font readable from 3 meters: 52px generated, 22px original on desktop
-- **Word-level highlight:** within the current active line, the word currently being sung is highlighted in amber (`#FCD34D`) with a soft golden glow. Timing is syllable-proportional: each word's highlight duration = `(word.syllables / totalSyllables) × lineDurationMs`
+**Bottom bar (fixed):**
+- **▶/❚❚ button** — toggles play/pause
+- **Seekbar** — full-width scrubable range input, gradient fill (`#7C3AED → #06B6D4`). Dragging the seekbar pauses auto-scroll and jumps playback to the new position.
+- **Time label** — current time / total duration, e.g. `2:14 / 5:54`
+- **YouTube player** — always rendered per YouTube ToS, minimized to ~80×45px at the right edge of the bottom bar
 
-**Progress bar (fixed bottom):**
-- Full-width, 6px height, gradient fill (`#7C3AED → #06B6D4`) on `bg-card` track
-- Driven by `player.getCurrentTime()` every 100ms
-- Time label right-aligned: `2:14 / 5:54`
+**Playback start:**
+- On first load, playback is paused at 0:00
+- Tapping ▶ starts the YouTube player and the timing loop simultaneously
+- No overlay button — play/pause lives only in the bottom bar
 
 ---
 

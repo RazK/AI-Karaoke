@@ -50,10 +50,10 @@ Generated words are drawn from the dataset corpus. The model may combine or ligh
 End-rhymes are preserved where possible, without violating FR-6.
 
 #### FR-9 — Structured Output + Validation
-Claude returns a JSON array of line objects. The server validates syllable counts on every line using the CMU Pronouncing Dictionary (fallback: heuristic splitter).
-- Off by 1 syllable: accept and log
-- Off by > 1 syllable: retry (max 2 retries)
-- After 3 failures: show error, let host retry manually
+Claude returns a JSON array of line objects. The server validates syllable counts on every line using `pyphen` (Python) or the `syllable` npm package (TypeScript).
+- **Any mismatch** (even 1 syllable off): reject and retry. Zero tolerance.
+- Up to 3 attempts total (initial + 2 retries); each retry includes the specific failing lines.
+- After 3 failures: return 500, show error, let host retry manually.
 
 #### FR-10 — Play
 The host taps **Play**. The YouTube IFrame player starts and `songStartedAt` is recorded simultaneously when YouTube fires `onStateChange(PLAYING)`.
