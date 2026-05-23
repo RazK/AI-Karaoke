@@ -1,47 +1,25 @@
 # AI Karaoke
 
-*"The AI rewrote your songs. You still have to sing them."*
+**Docs-only repository.** Product and engineering specs live under [`docs/`](docs/). The Next.js app has been removed; scaffold the app when you are ready.
 
-Party karaoke where Claude rewrites every lyric line syllable-for-syllable using an absurd text source — IKEA manuals, Yelp reviews, legal disclaimers. The melody stays. The words become chaos.
+## What this is
 
-## How it works
+Party karaoke where Claude rewrites lyrics syllable-for-syllable using an absurd text source (IKEA manuals, Yelp reviews, etc.). v1 scope: **one device** in the room (laptop or TV) — no rooms, voting, or guest phones.
 
-1. Pick a song and a ridiculous dataset
-2. Claude rewrites every line, syllable-for-syllable
-3. Music plays inside the app; lyrics scroll in sync
-4. Sing. Chaos ensues.
+## Documentation (source of truth)
 
-## Stack
+| Doc | Purpose |
+|-----|---------|
+| [`docs/CHARTER.md`](docs/CHARTER.md) | Goals and version roadmap |
+| [`docs/SRS.md`](docs/SRS.md) | Requirements by version |
+| [`docs/SDD.md`](docs/SDD.md) | Architecture and data design |
+| [`docs/API.md`](docs/API.md) | `/api/generate` contract and prompts |
+| [`docs/UX.md`](docs/UX.md) | Screens and syllable grid |
 
-| Layer | Choice |
-|---|---|
-| Frontend | Next.js (App Router), Tailwind CSS |
-| AI | Claude API (`claude-sonnet-4-5`) via Vercel serverless |
-| Audio | YouTube IFrame API |
-| Lyric timing | Static JSON (`data/lrc/`) + `openai-whisper` for word timestamps |
-| Hosting | Vercel |
+## Seed data (optional)
 
-## Local setup
+Static catalog under `data/` (songs, datasets, LRC JSON) — not application code. Use when you scaffold the app.
 
-```bash
-npm install
-cp .env.local.example .env.local   # add ANTHROPIC_API_KEY
-npm run dev
-```
+## Next step
 
-Environment variables (`.env.local`):
-```
-ANTHROPIC_API_KEY=
-```
-
-## Documentation
-
-| Doc | Contents |
-|---|---|
-| [`docs/CHARTER.md`](docs/CHARTER.md) | Project goals, versions (v1/v2/v3), success criteria |
-| [`docs/SRS.md`](docs/SRS.md) | All functional and non-functional requirements by version |
-| [`docs/SDD.md`](docs/SDD.md) | System architecture, data design, component design |
-| [`docs/API.md`](docs/API.md) | API routes and Claude prompt strategy |
-| [`docs/UX.md`](docs/UX.md) | Design system, all screens, syllable grid spec |
-| [`CLAUDE.md`](CLAUDE.md) | AI agent working context |
-| [`AGENTS.md`](AGENTS.md) | Multi-agent build plan — branches, ownership, done criteria |
+When ready: create a Next.js App Router project, implement per `docs/SDD.md` and `docs/API.md`, and wire UI per `docs/UX.md`. See [`CLAUDE.md`](CLAUDE.md) and [`AGENTS.md`](AGENTS.md) for agent/human workflow.
