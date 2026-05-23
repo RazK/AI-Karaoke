@@ -1,0 +1,11 @@
+---
+description: Never merge to main without an approved PR — user merges only via GitHub PR approval
+alwaysApply: true
+---
+
+# Git — merge via approved PR only
+
+- **Never** merge branches into `main` (or `master`) locally and push — not even to "fix" Pages, CI, or deploy.
+- **Never** `git merge`, `git push origin main`, or fast-forward `main` without the user explicitly approving that specific PR in GitHub.
+- **Do** push feature branches, open PRs with `gh pr create`, and let the user review and merge in GitHub.
+- If something on `main` is blocked (e.g. GitHub Pages 404): explain why and offer a PR — do not merge unilaterally.
