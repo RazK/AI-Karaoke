@@ -10,7 +10,7 @@ Defines what AI Karaoke will do in each version. Source of truth for scope decis
 | Term | Definition |
 |---|---|
 | Host | The person running the app on the laptop/TV |
-| Song | A track with LRC timing data and syllable-annotated lyrics |
+| Song | A track with LRC timing data; syllables derived at runtime from line text |
 | Dataset | A text corpus used as source material for AI lyric rewriting |
 | Combo | A paired song + dataset |
 | Line | One lyric unit — generated row stacked above original row |
@@ -43,46 +43,50 @@ During generation, a progress screen shows the song × dataset combo name, an an
 #### FR-6 — Syllable Constraint (Hard)
 Every generated line must have exactly the same syllable count as the original.
 
-#### FR-7 — Dataset Constraint
+#### FR-7 — Corpus Rewrite (Hard)
+Each generated line must be a **new sentence built from the dataset corpus**, not the original lyric with words swapped. Syllable count comes from the original; wording and phrasing come from the corpus. See `docs/API.md` § Prompt Strategy for good/bad examples.
+
+#### FR-8 — Dataset Vocabulary
 Generated words are drawn from the dataset corpus. The model may combine or lightly modify words.
 
-#### FR-8 — Rhyme Preservation (Soft)
-End-rhymes are preserved where possible, without violating FR-6.
+#### FR-9 — Rhyme Preservation (Soft)
+End-rhymes are preserved where possible, without violating FR-6 or FR-7.
 
-#### FR-9 — Structured Output + Validation
-Claude returns a JSON array of line objects. The server validates syllable counts on every line using `pyphen` (Python) or the `syllable` npm package (TypeScript).
-- **Any mismatch** (even 1 syllable off): reject and retry. Zero tolerance.
+#### FR-10 — Structured Output + Validation
+Claude returns a JSON array of `{ "generated": string[][] }` objects (syllable strings per word). The server merges `original` and `startMs` from the LRC, then validates every line.
+- **Syllable match:** `sum(word.length)` on `generated` must equal `sum(word.length)` on `original` — zero tolerance.
+- **Any mismatch:** reject and retry.
 - Up to 3 attempts total (initial + 2 retries); each retry includes the specific failing lines.
 - After 3 failures: return 500, show error, let host retry manually.
 
-#### FR-10 — Play
+#### FR-11 — Play
 The host taps **Play**. The YouTube IFrame player starts and `songStartedAt` is recorded simultaneously when YouTube fires `onStateChange(PLAYING)`.
 
-#### FR-11 — Syllable Grid Display
+#### FR-12 — Syllable Grid Display
 Lyrics are rendered in a CSS grid where each column = one syllable. Generated line (row 1, large, white) sits directly above original line (row 2, small, gray), syllable-aligned.
 
-#### FR-12 — Multi-Syllable Word Spanning
+#### FR-13 — Multi-Syllable Word Spanning
 Words with multiple syllables span multiple grid columns (`grid-column: span N`).
 
-#### FR-13 — Synchronized Line Wrapping
+#### FR-14 — Synchronized Line Wrapping
 Both rows always wrap together at the same syllable-column boundary.
 
-#### FR-14 — Line Highlight
+#### FR-15 — Line Highlight
 The current active line is highlighted with a full-width violet glow bar behind both rows. Previous and next lines are visible at reduced opacity. The glow fades in over 150ms when a line becomes active.
 
-#### FR-15 — Frame-Accurate Timing
+#### FR-16 — Frame-Accurate Timing
 The host screen uses `player.getCurrentTime() * 1000` in a requestAnimationFrame loop to highlight the correct line in sync with audio playback.
 
-#### FR-16 — Song Progress Bar
+#### FR-17 — Song Progress Bar
 A full-width progress bar at the bottom shows song progress, driven by `player.getCurrentTime()`, updated every 100ms.
 
-#### FR-17 — Song × Dataset Label
+#### FR-18 — Song × Dataset Label
 The top bar shows the current song × dataset combo at all times during playback.
 
-#### FR-18 — Regenerate
+#### FR-19 — Regenerate
 The host can request a fresh generation at any time, bypassing the cache. Old lyrics stay visible until new ones arrive.
 
-#### FR-19 — Back to Picker
+#### FR-20 — Back to Picker
 After a song or at any point, the host can return to the song/dataset picker to start a new combo.
 
 ### 2.3 Non-Functional Requirements

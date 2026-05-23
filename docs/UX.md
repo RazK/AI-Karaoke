@@ -226,7 +226,7 @@ v1 has three screens: **Picker → Generating → Karaoke**
 - **Auto-scroll:** the view automatically scrolls to keep the active line centered. If the user manually scrolls, auto-scroll pauses and resumes after 3 seconds of inactivity.
 
 **Word-level highlight:**
-Within the active line, the word currently being sung is highlighted in amber (`#FCD34D`) with a soft golden glow. In v1, timing is syllable-proportional: `(word.syllables / totalSyllables) × lineDurationMs`. When `data/lrc/<id>-words.json` exists, use per-word `startMs`/`endMs` instead.
+Within the active line, the word currently being sung is highlighted in amber (`#FCD34D`) with a soft golden glow. In v1, timing is syllable-proportional: `(syllablesInWord / totalSyllablesInLine) × lineDurationMs`, where `syllablesInWord = word.length` in the lyric line format. When `data/lrc/<id>-words.json` exists, use per-word `startMs`/`endMs` instead.
 
 **Bottom bar (fixed):**
 - **▶/❚❚ button** — toggles play/pause
@@ -251,7 +251,7 @@ Each lyric unit is a **generated line paired with its original below it**, align
 grid-template-columns: repeat(N, 1fr)  /* N = syllables in this sub-row */
 ```
 
-Each word's `grid-column` is `span syllableCount`. Generated row sits directly above its paired original row within the same sub-row grid. Both rows share the column template — syllables align vertically.
+Each word spans `word.length` grid columns (`grid-column: span N`). Generated row sits directly above its paired original row within the same sub-row grid. Both rows share the column template — syllables align vertically.
 
 ```
 col:   1       2       3       4       5

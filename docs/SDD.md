@@ -127,7 +127,8 @@ POST /api/generate receives { songId, datasetId, bustCache }
   3. Build prompt (see API.md § Prompt Strategy)
   4. Call Claude API, expect JSON array
   5. Validate every line — zero tolerance:
-     sum(generated[i].syllables) must equal sum(original[i].syllables) exactly
+     syllableCount(original) must equal syllableCount(generated) exactly
+     (count = sum of syllable-array lengths per word; see docs/API.md)
      Any mismatch → reject and retry with error feedback (max 3 attempts total)
      3 failures → return 500
   6. Return validated lines array
@@ -158,7 +159,7 @@ Each lyric line renders as a CSS grid:
 grid-template-columns: repeat(N, 1fr)  /* N = total syllable count */
 ```
 
-Each word's `grid-column` is `startSyllable / span syllableCount`. Both rows (generated on top, original below) share the same grid, so syllables align vertically.
+Each word spans `word.length` grid columns. Both rows (generated on top, original below) share the same grid, so syllables align vertically.
 
 If the grid is too wide for the screen, both rows split at the same syllable-column boundary — they always wrap together.
 
