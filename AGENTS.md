@@ -85,7 +85,7 @@ Write `logs/agent-<LETTER>-DONE.md` with:
 - Anything unexpected that happened
 - Any open questions for the human
 
-Commit it, push it, open a PR into `feat/nextjs-scaffold`.
+Commit it, push it, open a PR into `main`.
 
 ---
 
@@ -117,20 +117,20 @@ Full architecture: `docs/SDD.md` | Scope: `docs/SRS.md` | UX flows: `docs/UX.md`
 ## Branch strategy
 
 ```
-feat/nextjs-scaffold        ← base branch — branch from here, PR back here
+main                                ← base branch — branch from here, PR back here
   ├── agent/A-lyric-generation
   ├── agent/B-word-timing
   ├── agent/C-api-route             (start after A merges)
   └── agent/D-timing-integration    (start after B merges)
 ```
 
-**Branch from `feat/nextjs-scaffold`, not `main`.** Main has docs only. The Next.js project lives on `feat/nextjs-scaffold`.
+**Branch from `main`.** Main now has the full app (Next.js scaffold merged in).
 
 Setup your branch:
 ```bash
 git fetch origin
-git checkout feat/nextjs-scaffold
-git pull origin feat/nextjs-scaffold
+git checkout main
+git pull origin main
 git checkout -b agent/A-lyric-generation   # use your agent's branch name
 git push -u origin agent/A-lyric-generation
 ```
@@ -499,7 +499,7 @@ git add . && git commit -m "agent-B: DONE — words written for bohemian-rhapsod
 ## Agent C — `/api/generate` Route
 
 **Branch:** `agent/C-api-route`
-**Status:** BLOCKED — start only after Agent A's PR is merged into `feat/nextjs-scaffold`
+**Status:** BLOCKED — start only after Agent A's PR is merged into `main`
 **Depends on:** Agent A
 **Estimated time:** 2–3 hours
 
@@ -512,7 +512,7 @@ Read `docs/API.md` entirely before writing a line of code.
 
 ```bash
 git fetch origin
-git checkout feat/nextjs-scaffold && git pull
+git checkout main && git pull
 git checkout -b agent/C-api-route
 git push -u origin agent/C-api-route
 mkdir -p app/api/generate logs
