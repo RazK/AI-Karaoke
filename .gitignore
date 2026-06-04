@@ -45,6 +45,20 @@ yarn-error.log*
 # claude
 .claude/
 
+# python venv / lyric-engine run artifacts
+.venv/
+.runs/
+
+# midi_melody download cache
+.midi_cache/
+
+# ide
+.idea/
+
+# python bytecode
+__pycache__/
+*.py[cod]
+
 # agent / tooling (do not commit)
 logs/
 scripts/
