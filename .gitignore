@@ -42,8 +42,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
-# claude
-.claude/
+# claude — ignore local settings but commit shared skills
+.claude/*
+!.claude/skills/
 
 # python venv / lyric-engine run artifacts
 .venv/
