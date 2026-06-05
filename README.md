@@ -1,55 +1,58 @@
 # AI Karaoke
 
-Party karaoke on **one device** (laptop or TV): pick a song and an absurd text source, AI rewrites the lyrics **syllable-for-syllable**, and everyone sings along to YouTube audio with synced on-screen lyrics.
+Pick a song. Pick an absurd text source. Claude rewrites the lyrics to match the song's syllable structure. Sing along in your browser with word-by-word highlighting.
 
-## What's in this repo
+## How it works
 
-| Path | Contents |
-|------|----------|
-| [`docs/`](docs/) | v1 product and engineering specs — architecture, API, UX, requirements, charter |
-| [`data/`](data/) | Seed catalog — songs, datasets, corpus text, LRC timing JSON |
+1. **Song** — pulled from [JamendoLyrics](https://github.com/f90/jamendolyrics) (20 English songs with line-level timestamps)
+2. **Corpus** — any text file in `data/datasets/` (IKEA manuals, Glassdoor reviews, Trump tweets, …)
+3. **Generation** — Claude rewrites the corpus to fit the song's syllable count, stress pattern, and rhyme scheme (via CMU pronouncing dict)
+4. **Playback** — browser karaoke player: lyrics scroll, words highlight left-to-right in sync with audio
 
-The app is **not scaffolded yet**. Implementation follows the specs below.
+## Stack
 
-## v1 intent
-
-- **Single device** in the room — no guest phones, rooms, or voting in v1
-- **Core loop:** picker → generating (AI lyrics) → karaoke (YouTube + syllable grid)
-- **Cache:** generated lyrics in `localStorage` (`lyrics_<songId>_<datasetId>`)
-- **Future:** multi-device party features are outlined briefly in [`docs/SRS.md`](docs/SRS.md)
-
-## Start here
-
-Read before writing code:
-
-1. [`docs/SDD.md`](docs/SDD.md) — architecture, data model, deployment
-2. [`docs/UX.md`](docs/UX.md) — screens, layout, syllable grid, YouTube sync
-3. [`docs/API.md`](docs/API.md) — `/api/generate` contract and prompts
-
-Supporting context: [`docs/SRS.md`](docs/SRS.md), [`docs/CHARTER.md`](docs/CHARTER.md). Doc index: [`docs/README.md`](docs/README.md).
-
-**Cursor / agents:** [`AGENTS.md`](AGENTS.md) and [`.cursor/rules/ai-karaoke-context.mdc`](.cursor/rules/ai-karaoke-context.mdc).
-
-## Build order
-
-1. **Scaffold** — Next.js App Router on Vercel, Tailwind, catalog wired from `data/`
-2. **`/api/generate`** — server route per `docs/API.md` (`ANTHROPIC_API_KEY` server-only)
-3. **Screens** — picker, generating, karaoke per `docs/UX.md`
-4. **YouTube sync** — IFrame API, LRC timing, syllable highlight, `localStorage` cache
-5. **Deploy** — Vercel; preview URLs on PRs (see `docs/SDD.md`)
+| Layer | Tech |
+|-------|------|
+| Backend | FastAPI (`server.py`) |
+| Frontend | Vanilla JS + Tailwind CDN (`static/index.html`) |
+| Audio | JamendoLyrics MP3s streamed from HuggingFace, cached locally |
+| Lyrics engine | `lyric_engine.py` — CMU pronouncing dict + Claude API |
 
 ## Local setup
 
-*After the Next.js app is scaffolded:*
-
 ```bash
-npm install
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-Create `.env.local` with your Anthropic API key (server-side only — never exposed to the client):
-
-```bash
-ANTHROPIC_API_KEY=
+Create `.env.local`:
+```
+ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-Run the dev server and implement screens per `docs/UX.md`. Deploy target: **Vercel**.
+Run:
+```bash
+python server.py
+# → http://localhost:8000
+```
+
+## Project layout
+
+```
+server.py            FastAPI server — songs, generation, audio proxy
+lyric_engine.py      Syllable analysis + Claude prompt builder (library)
+generate_corpus.py   One-off script for adding new corpus files
+static/index.html    Single-page karaoke app
+data/
+  datasets/          Corpus text files (one per source)
+  datasets.json      Corpus metadata (id, label)
+.lyric_cache/        Generated lyrics cache (gitignored)
+.jamendo_cache/      Downloaded MP3s (gitignored)
+```
+
+## Adding a corpus
+
+```bash
+python generate_corpus.py <id> "<Label>" "<description>" "<style>"
+# e.g.: python generate_corpus.py yelp-reviews "Yelp Reviews" "1-star restaurant yelp reviews" "angry diner"
+```

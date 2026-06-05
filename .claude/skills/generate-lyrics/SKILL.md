@@ -1,24 +1,22 @@
 ---
-description: Generate new lyrics for a song by fitting words from a corpus onto its lyric structure. Use when the user provides a song title and a corpus name and wants new lyrics generated.
+description: Generate lyrics for a Jamendo song via the web app. Use when the user wants to generate a new song+corpus combo.
 allowed-tools: Bash
 ---
 
-Run the lyric generation script:
+The web app at http://localhost:8000 is the primary interface for generating lyrics.
+
+To generate programmatically (e.g. for testing), POST to the API directly:
 
 ```bash
-ANTHROPIC_API_KEY=$(cat .env.local | cut -d= -f2) \
-.venv/bin/python lyric_engine.py $ARGUMENTS
+curl -s -X POST http://localhost:8000/api/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"song_id": "$SONG_ID", "corpus": "$CORPUS_ID"}' | jq .
 ```
 
-`$ARGUMENTS` should be: `"<title>" <corpus-name> [artist]`
+To list available songs and corpora:
+```bash
+curl -s http://localhost:8000/api/songs | jq '[.[] | {id, artist, title}]'
+curl -s http://localhost:8000/api/corpora | jq .
+```
 
-Examples:
-- `/generate-lyrics "A Whole New World" ikea-manuals`
-- `/generate-lyrics "Imagine" ikea-manuals "John Lennon"`  ← only if multiple artists share the title
-
-The song's lyric structure (syllable count + stress pattern + rhyme scheme) is derived from
-the original lyrics using the CMU pronouncing dictionary.
-If multiple artists share the title, the script will list them and ask the user to re-run with the artist specified.
-The corpus is loaded from `data/datasets/<corpus-name>.txt`.
-
-Show the output exactly as printed.
+Make sure `server.py` is running (`python server.py`) before calling these.
