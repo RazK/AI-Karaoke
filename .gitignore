@@ -42,8 +42,29 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
-# claude
-.claude/
+# claude — ignore local settings but commit shared skills
+.claude/*
+!.claude/skills/
+
+# python venv / lyric-engine run artifacts
+.venv/
+.runs/
+
+# generated lyric cache
+.lyric_cache/
+
+# old MIDI pipeline cache (no longer used)
+.midi_cache/
+
+# jamendo audio cache (downloaded MP3s)
+.jamendo_cache/
+
+# ide
+.idea/
+
+# python bytecode
+__pycache__/
+*.py[cod]
 
 # agent / tooling (do not commit)
 logs/

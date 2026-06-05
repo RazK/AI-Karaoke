@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Karaoke</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+    body { font-family: 'Inter', sans-serif; background: #0a0a0f; }
+
+    /* ── Scrolling lyrics rail ── */
+    #lyrics-rail {
+      overflow-y: scroll;
+      scroll-behavior: auto; /* we handle smooth manually */
+      scrollbar-width: none;
+    }
+    #lyrics-rail::-webkit-scrollbar { display: none; }
+
+    #lyrics-inner {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Line cards ── */
+    .lyric-line {
+      width: 100%;
+      max-width: 720px;
+      padding: 14px 24px;
+      text-align: center;
+      transition: opacity 0.25s ease;
+      line-height: 1.3;
+      user-select: none;
+    }
+
+    .lyric-line .original {
+      font-size: 11px;
+      color: #1a3d3b;
+      margin-top: 4px;
+      letter-spacing: 0.02em;
+      transition: color 0.3s ease;
+    }
+
+    /* past lines */
+    .lyric-line.past .text { color: #2a2a3a; font-size: 20px; font-weight: 600; }
+
+    /* upcoming lines */
+    .lyric-line.upcoming { }
+    .lyric-line.upcoming-1 .text { color: #4a4a6a; font-size: 22px; font-weight: 600; }
+    .lyric-line.upcoming-2 .text { color: #35354a; font-size: 19px; font-weight: 600; }
+    .lyric-line.upcoming-3 .text { color: #25253a; font-size: 16px; font-weight: 500; }
+    .lyric-line.upcoming-4 .text { color: #1a1a28; font-size: 14px; font-weight: 400; }
+
+    /* active line */
+    .lyric-line.active .original { color: #1e6b64; }
+
+    /* ── Word spans (generated) ── */
+    .word {
+      display: inline-block;
+      color: #35355a;
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: -0.01em;
+      transition: text-shadow 0.12s ease;
+      margin: 0 2px;
+    }
+    .word.lit {
+      color: #ffffff;
+      text-shadow: 0 0 30px rgba(168, 85, 247, 0.6), 0 0 60px rgba(168, 85, 247, 0.2);
+    }
+    .word.current {
+      color: #ffffff;
+      text-shadow: 0 0 8px rgba(255,255,255,0.95), 0 0 30px rgba(168, 85, 247, 1), 0 0 70px rgba(168, 85, 247, 0.55);
+    }
+    /* past lines: keep words bright but no glow */
+    .lyric-line.past .word.lit {
+      color: rgba(255, 255, 255, 0.6);
+      text-shadow: none;
+    }
+
+    /* ── Word spans (original) — teal palette ── */
+    .orig-word {
+      display: inline-block;
+      color: #1e4a47;
+      font-size: 15px;
+      margin: 0 1px;
+    }
+    .orig-word.lit     { color: #14b8a6; }
+    .orig-word.current { color: #5eead4; }
+    .lyric-line.past .orig-word.lit { color: #0d7a72; }
+
+    /* ── Progress bar ── */
+    #progress-track {
+      position: relative;
+      height: 3px;
+      background: #1a1a2e;
+      cursor: pointer;
+    }
+    #progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #7c3aed, #a855f7);
+      transition: width 0.1s linear;
+    }
+
+    /* ── Fade masks — on wrapper, not the scroll container ── */
+    #lyrics-wrap {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+    }
+    #lyrics-rail {
+      height: 100%;
+    }
+    .fade-edge {
+      position: absolute;
+      left: 0; right: 0;
+      height: 130px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .fade-top    { top: 0;    background: linear-gradient(to bottom, #0a0a0f, transparent); }
+    .fade-bottom { bottom: 0; background: linear-gradient(to top,   #0a0a0f, transparent); }
+
+    /* ── Pre-song countdown — lives in the lyrics flow above line 0 ── */
+    .cd-line {
+      width: 100%;
+      max-width: 720px;
+      padding: 14px 24px;
+      text-align: center;
+      line-height: 1.3;
+      transition: opacity 0.4s ease;
+    }
+    .cd-line.hidden-cd { opacity: 0; visibility: hidden; }
+    @keyframes cd-tick {
+      0%   { transform: scale(1.2); opacity: 0.5; }
+      100% { transform: scale(1);   opacity: 1; }
+    }
+    .cd-tick { animation: cd-tick 0.35s ease-out; }
+
+    /* ── Controls ── */
+    .ctrl-btn {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .ctrl-btn:hover { background: rgba(255,255,255,0.12); }
+
+    /* ── Setup screen ── */
+    select {
+      background: #13131f;
+      border: 1px solid #2a2a3f;
+      border-radius: 12px;
+      color: white;
+      box-sizing: border-box;
+      padding: 16px 44px 16px 0;
+      width: 100%;
+      min-height: 48px;
+      line-height: 1.4;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      cursor: pointer;
+      font-size: 15px;
+      text-indent: 16px;
+    }
+    #song-select   { border-color: rgba(139, 92, 246, 0.45); }
+    #corpus-select { border-color: rgba(20, 184, 166, 0.45); }
+    #song-select:focus   { border-color: #8b5cf6; }
+    #corpus-select:focus { border-color: #14b8a6; }
+
+    .history-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #13131f;
+      border: 1px solid #1e1e30;
+      border-radius: 12px;
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .history-card:hover { background: #1a1a2e; border-color: #7c3aed; }
+    .history-card .play-arrow {
+      color: #4a4a6a;
+      transition: color 0.2s;
+    }
+    .history-card:hover .play-arrow { color: #a855f7; }
+
+    .generate-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      border: none;
+      border-radius: 14px;
+      color: white;
+      font-weight: 800;
+      font-size: 18px;
+      padding: 16px;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+      box-shadow: 0 12px 30px rgba(124, 58, 237, 0.24);
+    }
+    .generate-btn:hover {
+      opacity: 0.95;
+      transform: translateY(-2px) scale(1.005);
+      box-shadow: 0 18px 36px rgba(124, 58, 237, 0.32);
+    }
+    .generate-btn:active {
+      transform: translateY(0) scale(0.99);
+    }
+    .generate-btn:focus-visible {
+      outline: 2px solid rgba(167, 139, 250, 0.95);
+      outline-offset: 4px;
+    }
+    .generate-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+  </style>
+</head>
+<body class="text-white">
+
+  <!-- ═══ SETUP SCREEN ═══════════════════════════════════════════════ -->
+  <div id="setup-screen" class="min-h-screen flex flex-col items-center justify-center p-8">
+    <div class="w-full max-w-3xl">
+
+      <div class="text-center mb-10">
+        <div class="text-6xl mb-3">🎤</div>
+        <h1 class="text-4xl font-black mb-2">AI Karaoke</h1>
+        <p class="text-gray-500">Any song. Any corpus. Pure chaos.</p>
+      </div>
+
+      <!-- Two-column on wide, stacked on narrow (generate on top) -->
+      <div class="flex flex-col md:flex-row md:items-start gap-8">
+
+        <!-- Generate new (top on narrow, left on wide) -->
+        <div class="flex-1">
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Generate new</p>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold mb-1.5" style="color:#c084fc">Song</label>
+              <select id="song-select"><option>Loading…</option></select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold mb-1.5" style="color:#5eead4">Corpus</label>
+              <select id="corpus-select"><option>Loading…</option></select>
+            </div>
+            <button class="generate-btn" id="generate-btn" onclick="startGenerate()">
+              Generate &amp; Play →
+            </button>
+          </div>
+          <div id="status-msg" class="mt-4 text-center text-sm text-gray-500 hidden"></div>
+        </div>
+
+        <!-- Divider — vertical on wide, horizontal on narrow -->
+        <div id="history-divider" class="hidden">
+          <div class="md:hidden flex items-center gap-3">
+            <div class="flex-1 h-px bg-gray-800"></div>
+            <span class="text-xs text-gray-600 uppercase tracking-wider">or play again</span>
+            <div class="flex-1 h-px bg-gray-800"></div>
+          </div>
+          <div class="hidden md:block w-px bg-gray-800 self-stretch"></div>
+        </div>
+
+        <!-- Play again (bottom on narrow, right on wide) -->
+        <div id="history-section" class="hidden flex-1">
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Play again</p>
+          <div id="history-list" class="space-y-2"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ KARAOKE SCREEN ═══════════════════════════════════════════════ -->
+  <div id="karaoke-screen" class="hidden flex-col" style="height:100vh;">
+
+    <!-- Top bar -->
+    <div class="flex items-center justify-between px-5 py-3 shrink-0" style="background:#0d0d1a; border-bottom:1px solid #1a1a2e;">
+      <button onclick="goBack()" class="text-gray-500 hover:text-white text-sm transition-colors">← Back</button>
+      <div class="flex-1 text-center">
+        <div id="kara-title" class="font-bold text-sm" style="color:#c084fc"></div>
+        <div id="kara-corpus" class="text-xs" style="color:#14b8a6"></div>
+      </div>
+      <div class="w-12"></div>
+    </div>
+
+    <!-- Lyrics rail wrapped so fade masks don't scroll with content -->
+    <div id="lyrics-wrap">
+      <div id="lyrics-rail">
+        <div id="lyrics-inner"></div>
+      </div>
+      <div class="fade-edge fade-top"></div>
+      <div class="fade-edge fade-bottom"></div>
+    </div>
+
+    <!-- Progress track (clickable) -->
+    <div id="progress-track" onclick="seekTo(event)" class="shrink-0">
+      <div id="progress-fill" style="width:0%"></div>
+    </div>
+
+    <!-- Controls -->
+    <div class="shrink-0 flex flex-col items-center gap-3 py-5 px-6" style="background:#0d0d1a; border-top:1px solid #1a1a2e;">
+      <audio id="audio" preload="auto"></audio>
+
+      <div class="flex items-center gap-8">
+        <button class="ctrl-btn w-11 h-11" style="position:relative" onclick="seekRel(-5)">
+          <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M12.5 3C8.36 3 4.86 5.28 3 8.5L1 6.5v6h6l-2.28-2.28C6.12 7.68 9.06 5.5 12.5 5.5c3.87 0 7 3.13 7 7s-3.13 7-7 7c-2.81 0-5.23-1.66-6.39-4.07l-2.27.91C5.47 19.44 8.75 22 12.5 22c5.25 0 9.5-4.25 9.5-9.5S17.75 3 12.5 3z"/></svg>
+          <span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-46%);font-size:10px;font-weight:800;line-height:1">5</span>
+        </button>
+
+        <button class="ctrl-btn w-16 h-16" id="play-btn" onclick="togglePlay()" style="background:linear-gradient(135deg,#7c3aed,#a855f7); border:none;">
+          <svg id="play-icon" class="w-8 h-8 ml-1" fill="white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="pause-icon" class="w-8 h-8 hidden" fill="white" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+
+        <button class="ctrl-btn w-11 h-11" style="position:relative" onclick="seekRel(5)">
+          <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M11.5 3C7.25 3 3 7.25 3 12.5S7.25 22 11.5 22c3.75 0 7.03-2.56 8.17-6.16l-2.27-.91C16.73 17.34 14.31 19 11.5 19c-3.87 0-7-3.13-7-7s3.13-7 7-7c3.44 0 6.38 2.18 7.5 5.22L16.72 8h6v-6l-2 2C19.14 5.28 15.64 3 11.5 3z"/></svg>
+          <span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-46%);font-size:10px;font-weight:800;line-height:1">5</span>
+        </button>
+      </div>
+
+      <div class="text-xs text-gray-600 font-mono">
+        <span id="time-current">0:00</span> / <span id="time-total">0:00</span>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let lines        = [];
+    let activeIdx    = -99; // sentinel — forces first tick to always update
+    let lastCdSecs   = -1;
+    let rafId        = null;
+    let scrollRafId  = null; // tracks in-progress scroll animation
+
+    // ── init ─────────────────────────────────────────────────────────
+
+    async function init() {
+      const [songs, corpora, history] = await Promise.all([
+        fetch('/api/songs').then(r => r.json()),
+        fetch('/api/corpora').then(r => r.json()),
+        fetch('/api/history').then(r => r.json()),
+      ]);
+
+      document.getElementById('song-select').innerHTML =
+        songs.map(s => `<option value="${s.id}">${s.artist} — ${s.title} [${s.genre}]</option>`).join('');
+      document.getElementById('corpus-select').innerHTML =
+        corpora.map(c => `<option value="${c.id}">${c.label}</option>`).join('');
+
+      if (history.length > 0) {
+        const list = document.getElementById('history-list');
+        list.innerHTML = history.map(h => `
+          <div class="history-card" onclick="playFromHistory('${h.song_id}','${h.corpus}')">
+            <div>
+              <div class="text-sm font-bold" style="color:#c084fc">${esc(h.artist)} — ${esc(h.title)}</div>
+              <div class="text-xs mt-0.5" style="color:#14b8a6">${esc(h.corpus_label)} · ${h.n_lines} lines</div>
+            </div>
+            <svg class="play-arrow w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+        `).join('');
+        document.getElementById('history-section').classList.remove('hidden');
+        document.getElementById('history-divider').classList.remove('hidden');
+      }
+    }
+
+    async function playFromHistory(songId, corpus) {
+      const btn = document.getElementById('generate-btn');
+      const msg = document.getElementById('status-msg');
+      btn.disabled = true;
+      msg.textContent = 'Loading…';
+      msg.classList.remove('hidden');
+      try {
+        const data = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ song_id: songId, corpus }),
+        }).then(r => r.json());
+        lines = data.lines;
+        // Set dropdowns to match
+        setSelectValue('song-select', songId);
+        setSelectValue('corpus-select', corpus);
+        launchKaraoke(songId, corpus, data);
+      } catch(e) {
+        msg.textContent = `Error: ${e.message}`;
+        btn.disabled = false;
+      }
+    }
+
+    function setSelectValue(id, val) {
+      const sel = document.getElementById(id);
+      for (const opt of sel.options) { if (opt.value === val) { sel.value = val; break; } }
+    }
+
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── generate ─────────────────────────────────────────────────────
+
+    async function startGenerate() {
+      const songId = document.getElementById('song-select').value;
+      const corpus = document.getElementById('corpus-select').value;
+      const btn    = document.getElementById('generate-btn');
+      const msg    = document.getElementById('status-msg');
+
+      btn.disabled = true;
+      btn.textContent = 'Generating…';
+      msg.textContent = 'Claude is rewriting the corpus to fit the song…';
+      msg.classList.remove('hidden');
+
+      try {
+        const data = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ song_id: songId, corpus }),
+        }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+
+        lines = data.lines;
+        launchKaraoke(songId, corpus, data);
+      } catch(e) {
+        msg.textContent = `Error: ${e.message}`;
+        btn.disabled = false;
+        btn.textContent = 'Generate & Play →';
+      }
+    }
+
+    // ── karaoke launch ────────────────────────────────────────────────
+
+    function launchKaraoke(songId, corpus, data) {
+      const songSel   = document.getElementById('song-select');
+      const corpusSel = document.getElementById('corpus-select');
+      document.getElementById('kara-title').textContent   = songSel.options[songSel.selectedIndex].text;
+      document.getElementById('kara-corpus').textContent  = corpusSel.options[corpusSel.selectedIndex].text;
+
+      // Show screen FIRST — rail needs real dimensions before buildLyricsDOM reads them
+      document.getElementById('setup-screen').classList.add('hidden');
+      const ks = document.getElementById('karaoke-screen');
+      ks.classList.remove('hidden');
+      ks.classList.add('flex');
+
+      buildLyricsDOM();
+      applyLineClasses(-1);
+      // Two RAFs: first lets the browser paint, second lets layout settle
+      requestAnimationFrame(() => requestAnimationFrame(() => { document.getElementById('lyrics-rail').scrollTop = 0; }));
+
+      const audio = document.getElementById('audio');
+      audio.src   = `/api/audio/${songId}`;
+      audio.addEventListener('loadedmetadata', () => {
+        document.getElementById('time-total').textContent = fmt(audio.duration);
+      });
+      audio.addEventListener('play',  () => setIcon('pause'));
+      audio.addEventListener('pause', () => setIcon('play'));
+      audio.addEventListener('ended', () => setIcon('play'));
+
+      // Use rAF for smooth word highlighting
+      function tick() {
+        updateKaraoke(audio.currentTime * 1000);
+        rafId = requestAnimationFrame(tick);
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    // ── DOM build ─────────────────────────────────────────────────────
+
+    function buildLyricsDOM() {
+      const inner = document.getElementById('lyrics-inner');
+      const rail  = document.getElementById('lyrics-rail');
+      inner.innerHTML = '';
+
+      // Countdown element — sits in the flow above line 0, styled like a lyric line
+      const cdLine  = document.createElement('div');
+      cdLine.className = 'cd-line';
+      const cdText  = document.createElement('div');
+      cdText.className = 'text';
+      const cdNum   = document.createElement('span');
+      cdNum.id = 'countdown-num';
+      cdNum.className = 'word';
+      cdNum.textContent = '…';
+      cdText.appendChild(cdNum);
+      const cdOrig  = document.createElement('div');
+      cdOrig.className = 'original';
+      cdOrig.id = 'countdown-label';
+      cdOrig.textContent = '♪ starting in…';
+      cdLine.appendChild(cdText);
+      cdLine.appendChild(cdOrig);
+      inner.appendChild(cdLine);
+
+      // Bottom padding so last line can reach center; top starts naturally at top
+      inner.style.paddingTop    = '24px';
+      inner.style.paddingBottom = (rail.clientHeight / 2) + 'px';
+
+      lines.forEach((line, i) => {
+        const div = document.createElement('div');
+        div.className = 'lyric-line upcoming';
+        div.dataset.idx = i;
+
+        // Word spans
+        const textDiv = document.createElement('div');
+        textDiv.className = 'text';
+        line.generated.split(' ').forEach((w, wi) => {
+          const span = document.createElement('span');
+          span.className = 'word';
+          span.textContent = w;
+          span.dataset.wi = wi;
+          textDiv.appendChild(span);
+          if (wi < line.generated.split(' ').length - 1) {
+            textDiv.appendChild(document.createTextNode(' '));
+          }
+        });
+
+        // Original text — word spans for synchronized highlight
+        const origDiv = document.createElement('div');
+        origDiv.className = 'original';
+        origDiv.appendChild(document.createTextNode('♪ '));
+        `${line.original}`.split(' ').forEach((w, wi, arr) => {
+          const span = document.createElement('span');
+          span.className = 'orig-word';
+          span.textContent = w;
+          origDiv.appendChild(span);
+          if (wi < arr.length - 1) origDiv.appendChild(document.createTextNode(' '));
+        });
+
+        div.appendChild(textDiv);
+        div.appendChild(origDiv);
+        inner.appendChild(div);
+      });
+    }
+
+    // ── karaoke update loop ───────────────────────────────────────────
+
+    function updateKaraoke(ms) {
+      // Find active line
+      let idx = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (ms >= lines[i].start_ms && ms < lines[i].end_ms) { idx = i; break; }
+      }
+      // Between lines: hold on last sung line
+      if (idx === -1) {
+        for (let i = lines.length - 1; i >= 0; i--) {
+          if (ms > lines[i].end_ms) { idx = i; break; }
+        }
+      }
+
+      // Update scroll if line changed
+      if (idx !== activeIdx) {
+        activeIdx = idx;
+        // During intro (before first lyric), keep line 0 centered as "next up"
+        if (idx >= 0) scrollToLine(idx);
+        applyLineClasses(idx);
+      }
+
+      // Word highlight within active line
+      if (idx >= 0 && idx < lines.length) {
+        highlightWords(idx, ms);
+      }
+
+      // Pre-song countdown — element lives in lyrics flow above line 0
+      const cdLine = document.querySelector('.cd-line');
+      const numEl  = document.getElementById('countdown-num');
+      if (cdLine && lines.length && ms < lines[0].start_ms) {
+        const secsLeft = Math.ceil((lines[0].start_ms - ms) / 1000);
+        if (secsLeft !== lastCdSecs) {
+          lastCdSecs = secsLeft;
+          numEl.textContent = secsLeft;
+          numEl.classList.remove('current', 'cd-tick');
+          void numEl.offsetWidth;
+          numEl.classList.add('current', 'cd-tick');
+        }
+        cdLine.classList.remove('hidden-cd');
+      } else if (cdLine) {
+        lastCdSecs = -1;
+        numEl.classList.remove('current');
+        cdLine.classList.add('hidden-cd');
+      }
+
+      // Progress bar + time
+      const audio = document.getElementById('audio');
+      if (audio.duration) {
+        const pct = (audio.currentTime / audio.duration) * 100;
+        document.getElementById('progress-fill').style.width = pct + '%';
+        document.getElementById('time-current').textContent = fmt(audio.currentTime);
+      }
+    }
+
+    function scrollToLine(idx, animate = true) {
+      const rail  = document.getElementById('lyrics-rail');
+      const items = rail.querySelectorAll('.lyric-line');
+      const lineEl = items[Math.max(0, idx)];
+      if (!lineEl) return;
+
+      // Center the line in the rail
+      const target = lineEl.offsetTop + lineEl.offsetHeight / 2 - rail.clientHeight / 2;
+
+      if (animate) {
+        smoothScroll(rail, target, 420);
+      } else {
+        rail.scrollTop = target;
+      }
+    }
+
+    // Custom smooth scroll — cancels any in-progress scroll before starting
+    function smoothScroll(el, target, duration) {
+      if (scrollRafId) { cancelAnimationFrame(scrollRafId); scrollRafId = null; }
+      const start     = el.scrollTop;
+      const delta     = target - start;
+      if (Math.abs(delta) < 1) return;
+      const startTime = performance.now();
+      function step(now) {
+        const t    = Math.min(1, (now - startTime) / duration);
+        const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+        el.scrollTop = start + delta * ease;
+        if (t < 1) scrollRafId = requestAnimationFrame(step);
+        else scrollRafId = null;
+      }
+      scrollRafId = requestAnimationFrame(step);
+    }
+
+    function applyLineClasses(activeI) {
+      const items = document.getElementById('lyrics-inner').querySelectorAll('.lyric-line');
+      items.forEach((el, i) => {
+        el.className = 'lyric-line';
+        const diff = i - activeI;
+        if (diff < 0) {
+          el.classList.add('past');
+          litWords(el);
+        } else if (diff === 0) {
+          el.classList.add('active');
+        } else {
+          el.classList.add('upcoming',
+            diff === 1 ? 'upcoming-1' :
+            diff === 2 ? 'upcoming-2' :
+            diff === 3 ? 'upcoming-3' : 'upcoming-4');
+          clearWords(el);
+        }
+      });
+    }
+
+    function clearWords(lineEl) {
+      lineEl.querySelectorAll('.word, .orig-word').forEach(w => {
+        w.classList.remove('lit');
+        w.style.color = '';
+      });
+    }
+
+    function litWords(lineEl) {
+      lineEl.querySelectorAll('.word, .orig-word').forEach(w => {
+        w.style.color = '';
+        w.classList.add('lit');
+      });
+    }
+
+    function highlightWords(idx, ms) {
+      const line   = lines[idx];
+      const inner  = document.getElementById('lyrics-inner');
+      const lineEl = inner.querySelectorAll('.lyric-line')[idx];
+      if (!lineEl) return;
+
+      const progress = Math.max(0, Math.min(1,
+        (ms - line.start_ms) / (line.end_ms - line.start_ms)
+      ));
+
+      // lit=white, dim=dark-purple
+      applyWordProgress(lineEl.querySelectorAll('.word'),      progress, [255,255,255], [53,53,90]);
+      // lit=teal, dim=dark-teal
+      applyWordProgress(lineEl.querySelectorAll('.orig-word'), progress, [20,184,166],  [30,74,71]);
+    }
+
+    // Interpolate color as sweep cursor passes through each word (left→right).
+    // Words fully passed → 'lit' class (CSS glow). Current word → inline rgb().
+    // Only writes to DOM when state actually changes.
+    function applyWordProgress(words, progress, litRGB, dimRGB) {
+      const n = words.length;
+      if (n === 0) return;
+      const fillPos = progress * n;
+
+      words.forEach((w, i) => {
+        const t = Math.max(0, Math.min(1, fillPos - i)); // 0=unlit, 1=fully lit
+
+        if (t >= 1) {
+          if (!w.classList.contains('lit')) {
+            w.style.color = '';
+            w.classList.add('lit');
+          }
+        } else if (t > 0) {
+          w.classList.remove('lit');
+          const r = Math.round(dimRGB[0] + (litRGB[0] - dimRGB[0]) * t);
+          const g = Math.round(dimRGB[1] + (litRGB[1] - dimRGB[1]) * t);
+          const b = Math.round(dimRGB[2] + (litRGB[2] - dimRGB[2]) * t);
+          w.style.color = `rgb(${r},${g},${b})`;
+        } else {
+          if (w.classList.contains('lit') || w.style.color) {
+            w.classList.remove('lit');
+            w.style.color = '';
+          }
+        }
+      });
+    }
+
+    // ── controls ─────────────────────────────────────────────────────
+
+    function togglePlay() {
+      const a = document.getElementById('audio');
+      a.paused ? a.play() : a.pause();
+    }
+
+    function seekRel(s) {
+      const a = document.getElementById('audio');
+      a.currentTime = Math.max(0, a.currentTime + s);
+    }
+
+    function seekTo(e) {
+      const a     = document.getElementById('audio');
+      const track = document.getElementById('progress-track');
+      const pct   = e.offsetX / track.clientWidth;
+      if (a.duration) a.currentTime = pct * a.duration;
+    }
+
+    function setIcon(which) {
+      document.getElementById('play-icon').classList.toggle('hidden',  which !== 'play');
+      document.getElementById('pause-icon').classList.toggle('hidden', which !== 'pause');
+    }
+
+    function goBack() {
+      cancelAnimationFrame(rafId);
+      const a = document.getElementById('audio');
+      a.pause(); a.src = '';
+      activeIdx = -99; lines = []; lastCdSecs = -1;
+      document.getElementById('karaoke-screen').classList.add('hidden');
+      document.getElementById('karaoke-screen').classList.remove('flex');
+      document.getElementById('setup-screen').classList.remove('hidden');
+      const btn = document.getElementById('generate-btn');
+      btn.disabled = false; btn.textContent = 'Generate & Play →';
+      document.getElementById('status-msg').classList.add('hidden');
+    }
+
+    function fmt(s) {
+      if (!s || isNaN(s)) return '0:00';
+      return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+    }
+
+    init();
+  </script>
+</body>
+</html>

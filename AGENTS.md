@@ -1,33 +1,32 @@
-# AI Karaoke — Cursor agent guide
+# AI Karaoke — agent guide
 
-Human-in-the-loop development: you assist with focused, reviewable work; the user directs scope, commits, and PRs.
+## What this is
 
-## Before coding
+Browser karaoke app: pick a JamendoLyrics song + text corpus → Claude rewrites lyrics to match syllable/stress structure → play back with word-by-word highlight.
 
-1. Read **`docs/`** — especially `SDD.md`, `API.md`, `UX.md`
-2. Read **`.cursor/rules/ai-karaoke-context.mdc`** — v1 scope and repo layout
-3. Inspect **`data/`** — songs, datasets, LRC files to wire into the app
+## Stack
 
-## v1 scope (locked)
-
-- **One device** (laptop or TV): picker → generating → karaoke
-- YouTube IFrame API for audio; AI lyric rewrite via `/api/generate`
-- `localStorage` cache: `lyrics_<songId>_<datasetId>`
-- **Out of scope unless the user asks:** rooms, guest phones, Supabase, voting (see `docs/SRS.md` for future requirements)
+- **`server.py`** — FastAPI. Endpoints: `GET /api/songs`, `GET /api/corpora`, `GET /api/history`, `POST /api/generate`, `GET /api/audio/{song_id}`
+- **`lyric_engine.py`** — pure library (no CLI). Exports: `line_stress`, `count_syllables`, `rhyme_label`, `build_structure`, `build_prompt`
+- **`static/index.html`** — single-file vanilla JS + Tailwind CDN. No build step.
+- **`data/datasets/`** — corpus `.txt` files. `data/datasets.json` is the manifest.
+- **`.lyric_cache/`** — JSON cache of generated lyrics, keyed by `md5(jamendo|{song_id}|{corpus})`
+- **`.jamendo_cache/`** — downloaded MP3s
 
 ## Working rules
 
-1. **Human-in-the-loop** — no unattended overnight runs, status churn, or coordination commits; no `logs/` in the repo
-2. **One branch at a time** — small diffs; open a PR when the user asks
-3. **Docs ↔ code before commit** — see `.cursor/rules/docs-consistency.mdc`. Every behavior/API/UX/architecture change updates the matching `docs/` file in the same commit; no duplication of what code already says clearly
-4. **Commit only when the user asks** — never commit `.env` or `.env.local`
-5. **Minimize scope** — match the request; scaffold the Next.js app only when asked
-6. **Do not add** `logs/`, `scripts/output/`, or `__pycache__/`
+1. **Human-in-the-loop** — no unattended runs; commit only when the user asks
+2. **No build step** — `static/index.html` is served as-is; Tailwind via CDN
+3. **Docs ↔ code** — update README / AGENTS when behaviour or layout changes
+4. **Never commit** `.env.local`, cache dirs, or `__pycache__`
 
-## Next.js
+## Key design decisions
 
-When upgrading or scaffolding, check `node_modules/next/dist/docs/` for breaking changes in the installed version.
+- Audio is streamed from HuggingFace LFS URLs (`/resolve/main/subsets/en/mp3/{id}.mp3`) and cached locally — `hf_hub_download` returns LFS pointers, not the actual file
+- Word highlighting uses JS color interpolation at 60 fps (no CSS transitions on color — they conflict with rAF updates)
+- Smooth scroll uses a custom rAF loop that cancels the previous animation before starting a new one
+- The pre-song countdown is rendered as the first DOM element inside `#lyrics-inner` (in the lyrics flow, above line 0) so it sits naturally one slot above the first lyric
 
-## Scaffolding the app
+## Corpus format
 
-Follow `docs/SDD.md`, `docs/API.md`, and `docs/UX.md`. Build order: scaffold → `/api/generate` → screens → YouTube sync → deploy on Vercel.
+Plain text, paragraphs separated by blank lines. Paragraphs shorter than 60 chars are skipped. The engine distributes paragraphs across song sections proportionally by line count.

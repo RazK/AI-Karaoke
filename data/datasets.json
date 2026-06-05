@@ -28,5 +28,23 @@
     "label": "Craigslist Ads",
     "description": "Mysterious classified listings",
     "free": true
+  },
+  {
+    "id": "wine-reviews",
+    "label": "Wine Reviews",
+    "description": "Pretentious sommelier tasting notes",
+    "free": true
+  },
+  {
+    "id": "trump-tweets",
+    "label": "Donald Trump Tweets",
+    "description": "Presidential tweets in the style of Donald Trump",
+    "free": true
+  },
+  {
+    "id": "glassdoor-reviews",
+    "label": "Glassdoor Reviews",
+    "description": "Disgruntled employee Glassdoor reviews",
+    "free": true
   }
 ]

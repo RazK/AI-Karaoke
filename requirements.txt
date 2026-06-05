@@ -1,0 +1,7 @@
+pretty_midi==0.2.11
+mido
+requests
+tqdm
+pytest
+black
+ruff
