@@ -24,8 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from huggingface_hub import hf_hub_download
 from pydantic import BaseModel
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from demo.generate_lyrics import (
+from lyric_engine import (
     build_prompt,
     build_structure,
     count_syllables,
