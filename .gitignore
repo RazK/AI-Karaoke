@@ -53,6 +53,9 @@ yarn-error.log*
 # midi_melody download cache
 .midi_cache/
 
+# jamendo audio cache (downloaded MP3s)
+.jamendo_cache/
+
 # ide
 .idea/
 
