@@ -50,8 +50,8 @@ yarn-error.log*
 .venv/
 .runs/
 
-# midi_melody download cache
-.midi_cache/
+# generated lyric cache
+.lyric_cache/
 
 # jamendo audio cache (downloaded MP3s)
 .jamendo_cache/

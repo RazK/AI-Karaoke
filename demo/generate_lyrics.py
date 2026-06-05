@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pronouncing
 import anthropic
 
-_CACHE_DIR     = Path(".midi_cache/lyrics")
+_CACHE_DIR     = Path(".lyric_cache")
 _CORPUS_PICKLE = Path(".midi_cache/lmd_corpus.pickle")
 _COL           = 32
 _SEP           = "  │  "

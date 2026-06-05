@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 _HF_REPO    = "jamendolyrics/jamendolyrics"
 _CACHE_DIR  = Path(".jamendo_cache")
-_GEN_CACHE  = Path(".midi_cache/lyrics")
+_GEN_CACHE  = Path(".lyric_cache")
 _DATA_DIR   = Path("data/datasets")
 
 app = FastAPI(title="AI Karaoke")
