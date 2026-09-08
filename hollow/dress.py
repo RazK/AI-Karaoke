@@ -316,9 +316,12 @@ def manual_writer(dir_path):
 
         key = hashlib.md5(prompt.encode()).hexdigest()[:10]
         q, a = d / f"{key}.prompt.txt", d / f"{key}.answer.txt"
+        # Always rewrite the question, answered or not, so that a caller can
+        # tell this run's questions from ones left over by an earlier shape of
+        # the song.
+        q.write_text(prompt, encoding="utf-8")
         if a.exists():
             return a.read_text(encoding="utf-8")
-        q.write_text(prompt, encoding="utf-8")
         raise NeedsAnswer(f"answer needed: write {a}")
 
     return ask
@@ -383,9 +386,12 @@ def dress(
     log(f"licence {licence:.2f}: {len(lines)}/{len(h.lines)} lines found in the corpus")
 
     # Everything still empty goes to the writer, a phrase group at a time so it
-    # can see what its lines have to sit next to.
+    # can see what its lines have to sit next to. At licence 0 there is no
+    # writer: the corpus's own phrases are the whole of the output, and a line
+    # they cannot fill is a bend worth knowing about.
     missing = [l.id for l in h.lines if l.id not in lines]
-    if missing and writer is not None:
+    unanswered: list[str] = []
+    if missing and writer is not None and licence > 0:
         for gi, ids in enumerate(h.groups):
             gap = [i for i in ids if i not in lines]
             if not gap:
@@ -394,11 +400,19 @@ def dress(
                 legend=_rows(h, gi, lines), corpus=corpus_text.strip()[:6000],
                 licence=licence, licence_note=_note(licence), n=len(gap),
             )
-            reply = writer(prompt)
+            try:
+                reply = writer(prompt)
+            except NeedsAnswer as need:
+                # Keep going so that one run puts every question on the table
+                # rather than one per attempt.
+                unanswered.append(str(need))
+                continue
             for m in _ANSWER.finditer(reply):
                 lid = int(m.group(1))
                 if lid in gap:
                     lines[lid] = m.group(2).strip(' "')
+    if unanswered:
+        raise NeedsAnswer("\n".join(unanswered))
 
     # Anything the writer did not answer, and everything at licence 0, falls
     # back to the closest phrase the corpus has. The song always plays.

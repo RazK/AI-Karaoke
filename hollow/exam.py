@@ -108,7 +108,17 @@ def score(h: Hollow, written: list[str]) -> Score:
     stress = stress_hit / stress_total if stress_total else 1.0
     rhyme = rhyme_hit / len(pairs) if pairs else 1.0
     vowel = vowel_hit / vowel_total if vowel_total else 1.0
-    form = (1.0 * stress + 0.5 * rhyme + 0.5 * vowel) / 2.0
+
+    # form = (1.0*stress + 0.5*rhyme + 0.5*vowel) / 2.0, but a component with
+    # nothing to measure drops out and the weights close up behind it. A song
+    # with no held notes has no vowel test to pass, and handing it half a point
+    # for that was giving random words a fifth of the form score for free.
+    parts = [(1.0, stress)]
+    if pairs:
+        parts.append((0.5, rhyme))
+    if vowel_total:
+        parts.append((0.5, vowel))
+    form = sum(w * v for w, v in parts) / sum(w for w, _ in parts)
 
     return Score(
         score=8 * mean_fit + 2 * form,

@@ -208,7 +208,7 @@ def leaks(h: Hollow) -> list[str]:
         if isinstance(v, str):
             ok = (
                 v in allowed
-                or (len(v) == 1 and v.isupper())  # rhyme class label
+                or (v.isalpha() and v.isupper())  # rhyme class label: A..Z, AA..
                 or all(c in "0123456789abcdef" for c in v)  # content hash
             )
             if not ok:

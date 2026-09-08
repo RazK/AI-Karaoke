@@ -116,30 +116,18 @@ def count(text: str) -> int:
 
 
 def syllables_for(text: str, n_slots: int) -> list[Syl]:
-    """Syllables of a line, read the way a singer with `n_slots` would read it.
+    """Syllables of a line as they will be read, given `n_slots` on offer.
 
-    Words like "fire" and "every" have more than one honest reading. This picks
-    the combination of readings whose total lands closest to the slots on
-    offer, then falls back to the first reading of each word.
+    Deliberately the same reading every time -- each word's first and most
+    common one -- and deliberately not the reading that happens to fit. Letting
+    a line be re-read until it landed made the exam generous to the point of
+    uselessness: a line of the wrong length could be re-pronounced into the
+    right one, which no singer does and which let random text score.
+
+    `n_slots` is kept because callers ask "how does this line read against this
+    line of the song", and because a future reading model may well use it.
     """
-    ws = words(text)
-    if not ws:
-        return []
-    # best[total] = list of chosen readings reaching that total
-    best: dict[int, list[tuple[Syl, ...]]] = {0: []}
-    for w in ws:
-        nxt: dict[int, list[tuple[Syl, ...]]] = {}
-        for total, chosen in best.items():
-            for reading in pronunciations(w):
-                t = total + len(reading)
-                if t not in nxt:
-                    nxt[t] = chosen + [reading]
-        best = nxt
-        if len(best) > 64:  # keep the search near the target on long lines
-            keep = sorted(best, key=lambda t: abs(t - n_slots))[:64]
-            best = {t: best[t] for t in keep}
-    total = min(best, key=lambda t: (abs(t - n_slots), t))
-    return [s for reading in best[total] for s in reading]
+    return syllables(text)
 
 
 def stresses(text: str) -> list[bool]:
@@ -160,13 +148,28 @@ def rhyme_key(text: str) -> str:
     return last[-3:]
 
 
+def _label(i: int) -> str:
+    """A, B, ... Z, AA, AB, ... Labels never repeat, however many are needed.
+
+    They used to wrap at Z, which on a song with more than twenty-six rhyme
+    sounds quietly told the writer that two lines had to rhyme when they had
+    nothing in common.
+    """
+    out = ""
+    while True:
+        out = chr(ord("A") + i % 26) + out
+        i = i // 26 - 1
+        if i < 0:
+            return out
+
+
 def rhyme_classes(lines: list[str]) -> list[str]:
-    """Label lines A, B, C... so that lines sharing a label rhyme."""
+    """Label lines so that lines sharing a label rhyme, and only then."""
     labels, seen = [], {}
     for line in lines:
         key = rhyme_key(line)
         if key not in seen:
-            seen[key] = chr(ord("A") + len(seen) % 26)
+            seen[key] = _label(len(seen))
         labels.append(seen[key])
     return labels
 

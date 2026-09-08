@@ -1,7 +1,35 @@
-pretty_midi==0.2.11
-mido
+# Install with:
+#   pip install --index-url https://download.pytorch.org/whl/cpu torch torchaudio
+#   pip install -r requirements.txt
+# torch and torchaudio come from the CPU index first so that a machine without a
+# GPU does not pull down several gigabytes of CUDA it will never use.
+
+# the representation
+pronouncing            # CMU pronouncing dictionary: syllables, stress, rhyme
+librosa                # pitch, energy, onsets
+soundfile
+numpy
+scipy
+
+# getting a song in
+yt-dlp                 # a YouTube URL
+demucs                 # separates this recording into its vocal and its backing
+faster-whisper         # reads the words off the vocal, on this machine
+huggingface_hub        # JamendoLyrics, the freely licensed test material
 requests
-tqdm
+
+# the app
+fastapi
+uvicorn[standard]
+python-multipart       # karaoke file + recording upload
+anthropic              # the writer, at the inventive end of the licence dial
+python-dotenv
+httpx
+
+# singing a HOLLOW file back (optional — see sing/)
+pyworld                # WORLD vocoder: f0, spectral envelope, aperiodicity
+piper-tts              # local CPU voice
+
+# development
 pytest
-black
-ruff
+playwright             # checks the player at phone and desktop width

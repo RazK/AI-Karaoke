@@ -76,3 +76,6 @@ scripts/
 library/
 .work/
 karaoke/
+
+# generated handover: contains original lyrics, which stay local
+out/

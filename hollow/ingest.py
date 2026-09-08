@@ -143,7 +143,7 @@ def _tidy(video_title: str, uploader: str) -> tuple[str, str]:
 
 
 _LINE_GAP_S = 0.45
-_MAX_LINE_SYLLABLES = 14
+_MAX_LINE_SYLLABLES = 12
 
 
 def transcribe(vocals: str | Path, log=print, model: str = "small.en") -> list[TimedWord]:
@@ -198,6 +198,41 @@ def transcribe(vocals: str | Path, log=print, model: str = "small.en") -> list[T
     return out
 
 
+def _split_long(words: list[TimedWord], cap: int) -> list[TimedWord]:
+    """Break up any line that is still too long to be one line of karaoke.
+
+    Whisper phrases the vocal into breaths, and on a dense mix it takes very
+    long ones -- two sung lines come back as one seventeen-syllable line with
+    no gap anywhere in it to split on. Nobody can read that off a screen and
+    nobody can write words for it, so such a line is cut at its widest internal
+    pause however small that pause is.
+    """
+    def count(ws: list[TimedWord]) -> int:
+        return sum(len(prosody.pronunciations(w.text)[0]) for w in ws)
+
+    def cut(ws: list[TimedWord]) -> list[list[TimedWord]]:
+        if count(ws) <= cap or len(ws) < 4:
+            return [ws]
+        total, best, at = count(ws), None, len(ws) // 2
+        for k in range(2, len(ws) - 1):
+            # the widest pause, nudged towards an even split
+            score = (ws[k].start - ws[k - 1].end) + 0.15 * (
+                1 - abs(count(ws[:k]) - count(ws[k:])) / total)
+            if best is None or score > best:
+                best, at = score, k
+        return cut(ws[:at]) + cut(ws[at:])
+
+    by_line: dict[int, list[TimedWord]] = {}
+    for w in words:
+        by_line.setdefault(w.line, []).append(w)
+    out, line = [], 0
+    for i in sorted(by_line):
+        for piece in cut(by_line[i]):
+            out += [TimedWord(w.text, w.start, w.end, line, w.confidence) for w in piece]
+            line += 1
+    return out
+
+
 # ── one door for both paths ────────────────────────────────────────────────
 
 def ingest(
@@ -238,6 +273,11 @@ def ingest(
             raise ValueError("no vocal found in that recording")
         shift, sure = 0.0, True
         notes["word_timings"] = "whisper"
+
+    # Whichever door the words came through, a line has to be one line of
+    # karaoke: short enough to read off a screen and to write words for. Some
+    # karaoke files phrase a whole rapped verse as one thirty-syllable line.
+    words = _split_long(words, _MAX_LINE_SYLLABLES)
 
     h, originals = build(
         words, voicing,

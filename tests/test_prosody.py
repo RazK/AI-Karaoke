@@ -20,14 +20,25 @@ def test_open_syllable_can_be_held():
     assert syl.can_hold
 
 
-def test_fire_reads_as_the_slots_ask():
-    """Some words have more than one honest reading, and a singer picks one."""
-    assert len(prosody.syllables_for("fire", 1)) == 1
-    assert len(prosody.syllables_for("fire", 2)) == 2
+def test_a_line_reads_the_same_whatever_it_is_measured_against():
+    """A word has one reading here, not the reading that would flatter it.
+
+    Letting a line be re-pronounced until it fitted made the exam generous to
+    the point of uselessness: random text could be re-read into the right
+    length. Words like "fire" do have more than one honest reading, and that
+    cost is accepted in exchange for a score nothing can game.
+    """
+    for slots in (1, 2, 5, 9):
+        assert prosody.syllables_for("fire in every hour", slots) == \
+            prosody.syllables("fire in every hour")
 
 
-def test_reading_is_chosen_across_a_whole_line():
-    """The choice is made for the line, not word by word."""
-    line = "fire in every hour"
-    assert len(prosody.syllables_for(line, 5)) == 5
-    assert len(prosody.syllables_for(line, 7)) == 7
+def test_rhyme_labels_never_repeat():
+    """Past Z the labels used to wrap, and told a writer to rhyme lines that
+    had nothing in common."""
+    lines = [f"a word ending in {w}" for w in
+             "cat dog tree sun moon hill fork bell rain wolf ship gold lamp"
+             " nest cup drum flag horn ice jug kite leaf mist nut oak pit"
+             " quilt rope".split()]
+    labels = prosody.rhyme_classes(lines)
+    assert len(set(labels)) == len({prosody.rhyme_key(l) for l in lines})

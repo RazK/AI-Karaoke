@@ -30,8 +30,12 @@ LEAD_INS = [0, 3, 7]
 
 
 def _seed():
-    """A library song that still has the karaoke file it was built from."""
-    for song in LIBRARY.songs():
+    """A library song that still has the karaoke file it was built from.
+
+    Sorted, so that re-seeding the library cannot silently change which song
+    this is and leave the cached stems below belonging to a different one.
+    """
+    for song in sorted(LIBRARY.songs(), key=lambda s: s.ref):
         lrc = ROOT / song.source_ref
         mix = LIBRARY.dir(song.ref) / "mix.mp3"
         if song.source_kind == "karaoke_file" and lrc.exists() and mix.exists():
@@ -49,11 +53,12 @@ def spans():
 @pytest.fixture(scope="session")
 def voicings():
     """One separated, measured vocal per lead-in length."""
-    _, mix, _ = _seed()
-    WORK.mkdir(parents=True, exist_ok=True)
+    song, mix, _ = _seed()
+    work = WORK / song.ref  # the stems belong to one recording, so key them by it
+    work.mkdir(parents=True, exist_ok=True)
     out = {}
     for n in LEAD_INS:
-        shifted = WORK / f"lead{n}.wav"
+        shifted = work / f"lead{n}.wav"
         if not shifted.exists():
             pad = ["-af", f"adelay={n * 1000}|{n * 1000}"] if n else []
             subprocess.run(
@@ -61,7 +66,7 @@ def voicings():
                 + pad + [str(shifted)],
                 check=True,
             )
-        vocals, _ = separate(shifted, WORK / f"sep{n}")
+        vocals, _ = separate(shifted, work / f"sep{n}")
         out[n] = (analyse(vocals), audio_duration(shifted))
     return out
 
