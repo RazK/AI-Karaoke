@@ -75,8 +75,7 @@ def page(song, h, originals, d: Dressing, card) -> str:
         out.append(f"{left.ljust(width)}  {text}{mark}")
     if d.bends:
         out += ["", "WHERE THE TUNE HAD TO BEND", ""]
-        out += [f"  line {b.line:2d}: wanted {b.slots} syllables, got {b.written} — {b.why}"
-                for b in d.bends]
+        out += [f"  {b}" for b in d.bends]
     else:
         out += ["", "No line had to bend: every one of them has exactly the syllables "
                     "the tune asks for."]

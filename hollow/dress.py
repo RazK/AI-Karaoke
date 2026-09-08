@@ -39,6 +39,15 @@ class Bend:
     written: int
     why: str
 
+    def __str__(self) -> str:
+        # A bend is not always a syllable miscount -- a line can have exactly
+        # the right number and still sit wrong on the stresses. Saying "wanted
+        # 10, got 10" for one of those reads like nothing is wrong at all.
+        count = (f"wanted {self.slots} syllables, got {self.written}"
+                 if self.written != self.slots else
+                 f"{self.slots} syllables, which is right")
+        return f"line {self.line}: {count} — {self.why}"
+
 
 @dataclass
 class Dressing:
@@ -276,7 +285,7 @@ class NeedsAnswer(Exception):
     """A manual writer was asked something and has not answered yet."""
 
 
-def anthropic_writer(model: str = "claude-opus-4-6"):
+def anthropic_writer(model: str = "claude-opus-5"):
     """The writer, over the API. The key comes from the environment.
 
     What goes over the wire is a word-free HOLLOW rendering and a corpus the
@@ -290,7 +299,7 @@ def anthropic_writer(model: str = "claude-opus-4-6"):
 
     def ask(prompt: str) -> str:
         r = client.messages.create(
-            model=model, max_tokens=4000,
+            model=model, max_tokens=8000,
             messages=[{"role": "user", "content": prompt}],
         )
         return r.content[0].text

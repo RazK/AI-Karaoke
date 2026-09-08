@@ -141,6 +141,29 @@ tests/           49 tests, including the acceptance tests
 docs/            prior art, and one page on what this turned out to be
 ```
 
+## Song in, karaoke file out
+
+The smallest thing this repo does, and the easiest one to check. No player, no
+server — a recording and a body of text go in, a word-level `.lrc` of the
+rewritten song comes out, and you open it in any karaoke player to see whether
+it lands.
+
+```bash
+.venv/bin/python tools/lrc.py https://youtu.be/VIDEO ikea.txt --licence 0.6
+.venv/bin/python tools/lrc.py song.mp3 reviews.txt -o out.lrc
+```
+
+The first argument is either a YouTube URL or a path to an audio file you
+already have. Use the file when YouTube refuses — it does that to anything that
+looks like a server, and the rest of the pipeline is identical either way.
+
+`--licence 0` (the default) keeps to phrases already in your text and never
+calls a model, so it needs no key. Above 0 it needs `ANTHROPIC_API_KEY` in
+`.env.local`, and it says so before the slow part rather than after it.
+
+Expect four to six minutes on a first run: separating the recording and
+transcribing its vocal both happen on your machine.
+
 ## Licensing
 
 The seeded songs are freely licensed but not identically: two are **CC BY-ND**,

@@ -201,7 +201,7 @@ def leaks(h: Hollow) -> list[str]:
     The format's central promise is that it holds no words, so we check rather
     than assert it: every string in the file has to be a fixed schema value.
     """
-    allowed = {"youtube", "karaoke_file", "test", "file", "whisper"}
+    allowed = {"youtube", "karaoke_file", "upload", "test", "file", "whisper"}
     bad = []
 
     def walk(v, path):
