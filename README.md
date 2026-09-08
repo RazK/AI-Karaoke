@@ -164,6 +164,24 @@ calls a model, so it needs no key. Above 0 it needs `ANTHROPIC_API_KEY` in
 Expect four to six minutes on a first run: separating the recording and
 transcribing its vocal both happen on your machine.
 
+## A page you can send someone
+
+The app needs Demucs, a speech model and a few gigabytes of weights. Nobody is
+installing that to see whether the joke lands. So one song can be built into a
+single self-contained HTML file — every line, every take of it, and the backing
+track as a data URI — which opens in any browser with no server behind it.
+
+```bash
+.venv/bin/python tools/standalone.py "Feel (Stripped)" -o out/karaoke.html
+```
+
+It plays; it does not ingest. Separating a recording and transcribing its vocal
+are minutes of local CPU, and neither happens in a browser tab.
+
+It refuses to build a song whose licence forbids derivatives, rather than
+leaving that to memory — a karaoke rendition is a derivative, and two of the
+seeded songs are CC BY-ND.
+
 ## Licensing
 
 The seeded songs are freely licensed but not identically: two are **CC BY-ND**,
