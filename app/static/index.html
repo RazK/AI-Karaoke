@@ -88,6 +88,10 @@ input:focus,textarea:focus{outline:none;border-color:var(--hot)}
 .ln .orig{font-size:clamp(14px,2.6vw,21px);color:#2e5b56;letter-spacing:.005em;
   margin-bottom:7px;min-height:17px;font-weight:600;line-height:1.25}
 .ln .orig .ow{color:#2e5b56;transition:color .1s}
+/* even spacing by default; --gap is only honoured in timing mode */
+.ln .w,.ln .ow{margin-right:0}
+#play.timed .ln .w,#play.timed .ln .ow{margin-right:var(--gap,0)}
+#play.timed .ln .txt,#play.timed .ln .orig{word-spacing:.1em}
 .ln .txt{font-size:clamp(22px,6.5vw,40px);font-weight:800;letter-spacing:-.015em;
   line-height:1.2;overflow-wrap:break-word}
 .ln .w{color:#3a3a52;transition:color .1s}
@@ -126,6 +130,10 @@ input:focus,textarea:focus{outline:none;border-color:var(--hot)}
 .nudge .val{font-size:12px;color:var(--dim);min-width:66px;text-align:center;
   font-variant-numeric:tabular-nums}
 .nudge .val b{color:var(--ink)}
+.mode{border:1px solid var(--edge);border-radius:10px;padding:9px 12px;
+  font-size:12px;color:var(--dim)}
+.mode b{color:var(--ink);font-weight:650}
+.mode:hover{background:var(--panel)}
 
 /* card + rating */
 .sheet{position:fixed;inset:0;background:rgba(6,6,11,.93);backdrop-filter:blur(9px);
@@ -227,6 +235,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--hot)}
       <span id="tend">0:00</span>
     </div>
     <div class="ctl">
+      <button class="mode" id="spacing">spacing <b>even</b></button>
       <div class="nudge">
         <button onclick="nudge(-50)" title="lyrics earlier">◀</button>
         <span class="val">lyrics <b id="off">0 ms</b></span>

@@ -152,9 +152,8 @@ async function openSong(ref, name) {
     el.className = 'ln' + (l.uncertain ? ' unsure' : '');
     const ow = l.owords || [];
     el.innerHTML = `<div class="orig">${
-      ow.length ? ow.map(w => `<span class="ow">${esc(w.w)}</span>`).join(' ')
-                : esc(l.original)}</div><div class="txt">${
-      d.words[i].map(w => `<span class="w">${esc(w.w)}</span>`).join(' ')}</div>`;
+      ow.length ? spaced(ow, 'ow') : esc(l.original)}</div><div class="txt">${
+      spaced(d.words[i], 'w')}</div>`;
     el.onclick = () => { au.currentTime = Math.max(0, l.start - 0.3); };
     $('inner').append(el);
     return { el, line: l, words: d.words[i], owords: ow,
@@ -197,6 +196,35 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'ArrowRight') nudge(50);
   else if (e.key === ' ') { e.preventDefault(); toggleplay(); }
 });
+
+// Words can sit evenly, the way lyrics are normally set, or spaced by the gaps
+// in the timing file so the rhythm is visible on the page: a rest between two
+// words opens up, a run of quick ones closes in. Each word carries its own gap
+// as a custom property and the mode decides whether it is used at all.
+const PX_PER_SECOND = 62, MAX_GAP_PX = 130;
+
+function spaced(words, cls) {
+  return words.map((w, k) => {
+    const next = words[k + 1];
+    const gap = next ? Math.max(0, next.t - (w.t + w.d)) : 0;
+    const px = Math.min(Math.round(gap * PX_PER_SECOND), MAX_GAP_PX);
+    return `<span class="${cls}" style="--gap:${px}px">${esc(w.w)}</span>`;
+  }).join(' ');
+}
+
+let timed = localStorage.getItem('spacing') === 'timed';
+
+function applySpacing() {
+  $('play').classList.toggle('timed', timed);
+  $('spacing').innerHTML = `spacing <b>${timed ? 'by timing' : 'even'}</b>`;
+}
+
+$('spacing').onclick = () => {
+  timed = !timed;
+  try { localStorage.setItem('spacing', timed ? 'timed' : 'even'); } catch (e) {}
+  applySpacing();
+};
+applySpacing();
 
 $('seek').oninput = e => { if (au.duration) au.currentTime = au.duration * e.target.value / 1000; };
 
