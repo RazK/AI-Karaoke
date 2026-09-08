@@ -119,6 +119,9 @@ def song(ref: str):
 def dressing(ref: str, name: str):
     for d in lib.dressings(ref):
         if d["name"] == name:
+            # Recomputed rather than read back, so a rewrite saved before the
+            # timing gained a field still serves the current shape.
+            d["words"] = word_times(lib.hollow(ref), d["lines"])
             return d
     raise HTTPException(404, "not generated")
 

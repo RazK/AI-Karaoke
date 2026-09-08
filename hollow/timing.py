@@ -27,8 +27,13 @@ def word_times(h: Hollow, lines: list[str]) -> list[list[dict]]:
             j = max(j, i)
             start = line.slots[i].t
             end = line.slots[j].t + line.slots[j].sustain
+            # `i` and `n` are which slots this word sits on. Both the original
+            # and the rewrite land on the same slots, so a player that lays the
+            # two out on one column-per-slot grid gets each new word directly
+            # under the old word it replaces, for free.
             row.append({"w": w, "t": round(start, 3),
-                        "d": round(max(end - start, 0.05), 3)})
+                        "d": round(max(end - start, 0.05), 3),
+                        "i": i, "n": j - i + 1})
             at += c
         out.append(row)
     return out

@@ -85,15 +85,34 @@ input:focus,textarea:focus{outline:none;border-color:var(--hot)}
   to bottom,transparent,#000 16%,#000 84%,transparent)}
 #inner{position:absolute;left:0;right:0;top:50%;will-change:transform}
 .ln{padding:9px 20px;text-align:center;transition:opacity .3s}
-.ln .orig{font-size:clamp(14px,2.6vw,21px);color:#2e5b56;letter-spacing:.005em;
-  margin-bottom:7px;min-height:17px;font-weight:600;line-height:1.25}
+/* The two rows are a pair, so they are sized as one: the sung line leads and
+   the original sits just under it, close enough to read as its partner rather
+   than as a caption. --fit shrinks a long line to the width it has. */
+.ln{--now:clamp(21px,5.6vw,38px);--was:clamp(16px,4.1vw,27px)}
+.ln.done,.ln.ahead{--now:clamp(14px,2.4vw,21px);--was:clamp(11px,1.9vw,15px)}
+.ln .orig{font-size:calc(var(--was) * var(--fit,1));color:#2e5b56;
+  letter-spacing:.005em;margin-bottom:6px;min-height:17px;font-weight:600;
+  line-height:1.25}
 .ln .orig .ow{color:#2e5b56;transition:color .1s}
-/* even spacing by default; --gap is only honoured in timing mode */
-.ln .w,.ln .ow{margin-right:0}
-#play.timed .ln .w,#play.timed .ln .ow{margin-right:var(--gap,0)}
-#play.timed .ln .txt,#play.timed .ln .orig{word-spacing:.1em}
-.ln .txt{font-size:clamp(22px,6.5vw,40px);font-weight:800;letter-spacing:-.015em;
-  line-height:1.2;overflow-wrap:break-word}
+.ln .txt{font-size:calc(var(--now) * var(--fit,1));font-weight:800;
+  letter-spacing:-.015em;line-height:1.2;overflow-wrap:break-word}
+/* Word over word: one grid column per syllable, shared by both rows, so each
+   new word sits under the old one it replaces and a held syllable is a wide
+   column rather than something you have to take on trust. */
+/* One grid for the whole line, not one per row: display:contents dissolves the
+   two wrappers so every word from both rows is an item of the same grid. That
+   is what makes the columns resolve identically for the two rows -- with a grid
+   each they size to their own content and drift apart by a few pixels a word. */
+/* Only the line being sung and the one after it, where both rows are on screen
+   and the pairing is the point. Spreading every line across the full width
+   turns the rest of the screen into scattered words you cannot read ahead in. */
+#play.aligned .ln.on,#play.aligned .ln.next{display:grid;
+  grid-template-columns:var(--cols);align-items:baseline;justify-items:start;
+  column-gap:7px;row-gap:5px}
+#play.aligned .ln.on .orig,#play.aligned .ln.on .txt,
+#play.aligned .ln.next .orig,#play.aligned .ln.next .txt{display:contents}
+#play.aligned .ln.on .ow,#play.aligned .ln.next .ow{grid-row:1;white-space:nowrap}
+#play.aligned .ln.on .w,#play.aligned .ln.next .w{grid-row:2;white-space:nowrap}
 .ln .w{color:#3a3a52;transition:color .1s}
 .ln.on{padding:16px 20px}
 .ln.on .orig{color:#2f7d74}
@@ -101,11 +120,11 @@ input:focus,textarea:focus{outline:none;border-color:var(--hot)}
 .ln.on .orig .ow.lit{color:#7defdc;text-shadow:0 0 15px rgba(45,212,191,.45)}
 .ln.on .w.lit{color:#fff;text-shadow:0 0 22px rgba(168,85,247,.75)}
 .ln.done .w{color:rgba(255,255,255,.26)}
-.ln.done .txt,.ln.ahead .txt{font-size:clamp(14px,2.4vw,21px);font-weight:650}
+.ln.done .txt,.ln.ahead .txt{font-weight:650}
 .ln.done .orig,.ln.ahead .orig{display:none}
 /* the line you are about to sing keeps its original visible, so there is time
    to see the tune coming rather than meeting it on the beat */
-.ln.next .orig{display:block;font-size:clamp(12px,1.9vw,15px);color:#24504b}
+.ln.next .orig{display:block;color:#24504b}
 .ln.ahead .w{color:#565676}
 .ln.far{opacity:.45}
 .ln.unsure .txt::after{content:"?";color:var(--warn);font-size:.55em;

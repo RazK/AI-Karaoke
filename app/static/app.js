@@ -151,9 +151,10 @@ async function openSong(ref, name) {
     const el = document.createElement('div');
     el.className = 'ln' + (l.uncertain ? ' unsure' : '');
     const ow = l.owords || [];
+    el.style.setProperty('--cols', slotWidths(ow, l.slots));
     el.innerHTML = `<div class="orig">${
-      ow.length ? spaced(ow, 'ow') : esc(l.original)}</div><div class="txt">${
-      spaced(d.words[i], 'w')}</div>`;
+      ow.length ? grid(ow, 'ow') : esc(l.original)}</div><div class="txt">${
+      grid(d.words[i], 'w')}</div>`;
     el.onclick = () => { au.currentTime = Math.max(0, l.start - 0.3); };
     $('inner').append(el);
     return { el, line: l, words: d.words[i], owords: ow,
@@ -165,6 +166,7 @@ async function openSong(ref, name) {
   au.onloadedmetadata = () => { $('tend').textContent = clock(au.duration); };
   $('setup').classList.remove('on');
   $('play').classList.add('on');
+  if (aligned) fitLines();  // needs the player on screen: a hidden rail has no width
   $('bar').style.display = 'none';
   active = -1;
   au.play().catch(() => {});
@@ -197,34 +199,68 @@ document.addEventListener('keydown', e => {
   else if (e.key === ' ') { e.preventDefault(); toggleplay(); }
 });
 
-// Words can sit evenly, the way lyrics are normally set, or spaced by the gaps
-// in the timing file so the rhythm is visible on the page: a rest between two
-// words opens up, a run of quick ones closes in. Each word carries its own gap
-// as a custom property and the mode decides whether it is used at all.
-const PX_PER_SECOND = 62, MAX_GAP_PX = 130;
-
-function spaced(words, cls) {
-  return words.map((w, k) => {
-    const next = words[k + 1];
-    const gap = next ? Math.max(0, next.t - (w.t + w.d)) : 0;
-    const px = Math.min(Math.round(gap * PX_PER_SECOND), MAX_GAP_PX);
-    return `<span class="${cls}" style="--gap:${px}px">${esc(w.w)}</span>`;
-  }).join(' ');
+// Two ways to set the words.
+//
+// Flowing is how lyrics are normally printed: centred, evenly spaced, easy to
+// read and silent about rhythm.
+//
+// Word over word puts both lines on one grid with a column per syllable. The
+// original and the rewrite sit on the same syllables, so each new word lands
+// directly under the old one it replaces, and the columns are as wide as the
+// syllables are long -- which is where the rhythm becomes visible, and where a
+// held note becomes a wide column rather than a guess.
+function slotWidths(owords, slots) {
+  // How long each syllable lasts, taken from the original's own words. A word
+  // covering three syllables shares its time between them.
+  const each = new Array(slots).fill(0.25);
+  owords.forEach(w => {
+    for (let k = 0; k < (w.n || 1); k++) {
+      const at = (w.i || 0) + k;
+      if (at < slots) each[at] = Math.max(0.12, w.d / (w.n || 1));
+    }
+  });
+  // min-content, not 0: a column has to be at least as wide as the word in it
+  // or a long word runs into the next one and reads as "Shouldbe".
+  return each.map(d => `minmax(min-content,${d.toFixed(3)}fr)`).join(' ');
 }
 
-let timed = localStorage.getItem('spacing') === 'timed';
+function grid(words, cls) {
+  return words.map(w =>
+    `<span class="${cls}" style="grid-column:${(w.i || 0) + 1}/span ${w.n || 1}">`
+    // A space between the spans, not nothing: in flowing mode it is the space
+    // between the words, and in grid mode whitespace is never a grid item.
+    + `${esc(w.w)}</span>`).join(' ');
+}
 
-function applySpacing() {
-  $('play').classList.toggle('timed', timed);
-  $('spacing').innerHTML = `spacing <b>${timed ? 'by timing' : 'even'}</b>`;
+let aligned = localStorage.getItem('lines') === 'aligned';
+
+function applyLayout() {
+  $('play').classList.toggle('aligned', aligned);
+  $('spacing').innerHTML = `lines <b>${aligned ? 'word over word' : 'flowing'}</b>`;
+  if (aligned) fitLines();
+}
+
+// A twelve-syllable line will not fit twelve columns of text across a phone, so
+// each line is scaled to the width it has. Both rows scale together, which is
+// what keeps them aligned.
+function fitLines() {
+  const room = $('rail').clientWidth - 24;
+  if (room <= 0) return;  // the rail is not on screen yet; nothing to measure against
+  rows.forEach(r => {
+    r.el.style.setProperty('--fit', '1');
+    const wide = Math.max(r.el.querySelector('.orig').scrollWidth,
+                          r.el.querySelector('.txt').scrollWidth);
+    if (wide > room) r.el.style.setProperty('--fit', Math.max(0.45, room / wide).toFixed(3));
+  });
 }
 
 $('spacing').onclick = () => {
-  timed = !timed;
-  try { localStorage.setItem('spacing', timed ? 'timed' : 'even'); } catch (e) {}
-  applySpacing();
+  aligned = !aligned;
+  try { localStorage.setItem('lines', aligned ? 'aligned' : 'flowing'); } catch (e) {}
+  applyLayout();
 };
-applySpacing();
+addEventListener('resize', () => { if (aligned) fitLines(); });
+applyLayout();
 
 $('seek').oninput = e => { if (au.duration) au.currentTime = au.duration * e.target.value / 1000; };
 
