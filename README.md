@@ -1,58 +1,149 @@
 # AI Karaoke
 
-Pick a song. Pick an absurd text source. Claude rewrites the lyrics to match the song's syllable structure. Sing along in your browser with word-by-word highlighting.
+Take a song everyone knows. Take a body of text that has nothing to do with it —
+an IKEA assembly manual, a page of 1-star restaurant reviews, a terms-of-service
+agreement. Rewrite every line of the song out of that text so it still fits the
+melody. Same tune, same timing, absurd words. Everyone sings along from one
+laptop.
 
-## How it works
-
-1. **Song** — pulled from [JamendoLyrics](https://github.com/f90/jamendolyrics) (20 English songs with line-level timestamps)
-2. **Corpus** — any text file in `data/datasets/` (IKEA manuals, Glassdoor reviews, Trump tweets, …)
-3. **Generation** — Claude rewrites the corpus to fit the song's syllable count, stress pattern, and rhyme scheme (via CMU pronouncing dict)
-4. **Playback** — browser karaoke player: lyrics scroll, words highlight left-to-right in sync with audio
-
-## Stack
-
-| Layer | Tech |
-|-------|------|
-| Backend | FastAPI (`server.py`) |
-| Frontend | Vanilla JS + Tailwind CDN (`static/index.html`) |
-| Audio | JamendoLyrics MP3s streamed from HuggingFace, cached locally |
-| Lyrics engine | `lyric_engine.py` — CMU pronouncing dict + Claude API |
-
-## Local setup
+## Set it up
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+./setup.sh                       # a few minutes; installs a separator and a speech model
+.venv/bin/python app/server.py   # then open http://localhost:8000
 ```
 
-Create `.env.local`:
+`./setup.sh --full` also seeds the three songs the nine handover examples use.
+
+An Anthropic API key goes in `.env.local` and is only needed for the inventive
+end of the licence dial. Nothing else needs one — at licence 0 the system uses
+phrases the corpus already contains and never calls a model at all.
+
+## The three parts
+
+### 1. HOLLOW — a song with its words hollowed out
+
+`hollow/format.py`
+
+A HOLLOW file says how a song is sung and nothing about what it says. Per line:
+syllable **slots** with an onset and a measured **sustain**, a **stress** demand
+per slot, a **hold** flag where the performance sustains an open vowel, the
+melody as semitones from the line's first note plus an absolute `ref_hz`, phrase
+grouping, rhyme classes, and how confident the aligner was.
+
+It contains no words, letters, phonemes or word boundaries. Title and artist
+live in a library sidecar rather than the file, because plenty of songs are
+named after one of their own lines. `format.leaks()` checks this rather than
+assuming it, and a test asserts no word of the original appears anywhere in the
+serialised file.
+
+This is what a writer — or a language model — actually sees:
+
 ```
-ANTHROPIC_API_KEY=sk-ant-...
+GROUP 1
+  L00 [A]  5  ● ● ● ● ○              pitch +0 +12 +10 +9 +8
+  L01 [B]  9  ○ ● ○ ○ ●_ ○ ●_ ● ●_   pitch +0 +9 +10 +9 +9 +9 +7 +7 +6
+ ?L12 [L]  2  ● ●
 ```
 
-Run:
-```bash
-python server.py
-# → http://localhost:8000
+Extraction happens on this machine — Demucs for the stems, a local Whisper for
+the words, CMU for syllables and stress. **Complete lyrics of a copyrighted song
+are never sent to a language model.** Only the word-free representation leaves.
+
+`sing/` renders a HOLLOW file back as a sung vocal from the representation
+alone, which is the sharpest test of whether it carries enough.
+
+### 2. Dressing a corpus onto it
+
+`hollow/dress.py`
+
+One control: **licence**, 0 to 1.
+
+At 0 the system searches the corpus's own word runs for phrases whose syllable
+count and stress pattern already fit a line, trims them lightly, and never calls
+a model — recognisably IKEA, stilted, funny because it is real. At 1 it hands
+every line to the writer, which may paraphrase, pad, pun and coin words. In
+between, the bar a lifted phrase has to clear rises with the dial.
+
+Across the nine handover songs that moves corpus fidelity 98–100% at licence
+0.00, 54–79% at 0.60, 31–56% at 1.00.
+
+Fitting the melody is not on the dial. It is a hard constraint with one escape
+hatch: a line that cannot be filled falls back to the closest phrase the corpus
+has and is **declared as a bend**. At the faithful end that list is the most
+interesting output the system produces.
+
+### 3. The stage
+
+`app/server.py`, `app/static/`
+
+Pick a song, pick or paste a text, turn the dial, play it. Words highlight as
+they are sung, the original line sits above the rewrite, and a nudge control
+pulls the lyrics earlier or later without stopping the music. One HTML file and
+one script, no dependencies, so it comes up in a room with bad wifi.
+
+Songs come in two ways and end at the same file: **import a karaoke file** with
+the recording it belongs to (`.lrc`, plain or word-level), or **give it a
+YouTube URL**. The instrumental is always separated out of the recording
+actually loaded.
+
+## The singability exam
+
+`hollow/exam.py`
+
+```
+score = 8 × (mean over lines of fit) + 2 × form
+fit(line) = e^(−2.5 × |syllables written − slots in the line|)
+form = (1.0×stress + 0.5×rhyme + 0.5×vowel) / 2.0
 ```
 
-## Project layout
+Four calibration cases run over every song in the library on every build:
+
+| case | required | actual (5 songs) |
+|---|---|---|
+| the song's own words back on it | 10 | **10.00** |
+| same syllable counts, ignoring all else | ≥ 8 | 8.03 – 8.35 |
+| random syllable counts | 0 | 0.10 – 0.91 |
+| every other line one syllable too many | 5–6 | 5.15 – 5.76 |
+
+Cases 1 and 2 differ only in stress, rhyme and vowel quality — the timing is
+identical. The gap between them is the evidence that the format records those
+things at all. `pytest tests/` asserts every band.
+
+## The card
+
+Above a gate of 7/10, four things are reported side by side and none is averaged
+into another: how much of the wording is really the corpus's, how far its
+register sits from the song's, whether each line parses as English on its own,
+and whether the bend list was honest.
+
+When a human rating and the exam disagree by more than two points the song is
+flagged. Nothing is refitted automatically — the weights are a starting point.
+
+## Layout
 
 ```
-server.py            FastAPI server — songs, generation, audio proxy
-lyric_engine.py      Syllable analysis + Claude prompt builder (library)
-generate_corpus.py   One-off script for adding new corpus files
-static/index.html    Single-page karaoke app
-data/
-  datasets/          Corpus text files (one per source)
-  datasets.json      Corpus metadata (id, label)
-.lyric_cache/        Generated lyrics cache (gitignored)
-.jamendo_cache/      Downloaded MP3s (gitignored)
+hollow/          the core
+  format.py      HOLLOW: the representation, its text rendering, and leaks()
+  prosody.py     syllables, stress, rhyme, whether a syllable can be held
+  audio.py       separation, voicing, pitch
+  extract.py     timed words -> HOLLOW, then the words are discarded
+  offset.py      where the lyric sits against this recording
+  ingest.py      karaoke file or YouTube URL; both end at the same file
+  exam.py        the singability exam and its four calibration cases
+  dress.py       corpus -> lines, the licence dial, declared bends
+  grade.py       the card
+  library.py     songs, dressings and ratings on disk
+app/             the stage
+sing/            renders a HOLLOW file back as a sung vocal
+tools/           seeders, the nine, and a checker for whoever writes lines
+tests/           49 tests, including the acceptance tests
+docs/            prior art, and one page on what this turned out to be
 ```
 
-## Adding a corpus
+## What is not committed
 
-```bash
-python generate_corpus.py <id> "<Label>" "<description>" "<style>"
-# e.g.: python generate_corpus.py yelp-reviews "Yelp Reviews" "1-star restaurant yelp reviews" "angry diner"
-```
+`library/` holds extracted songs — audio, stems and the original lyric. The
+original lyric stays on the machine that extracted it. `out/` holds the nine
+handover texts, which print the original line beside each rewrite so the fit can
+be judged on the page; they are produced locally by `tools/handover.py`.
