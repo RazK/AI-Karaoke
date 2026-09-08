@@ -16,6 +16,11 @@ from .format import HOLD_S, Hollow, Line, Slot, pairs_from_classes
 # somewhere the singer is not.
 MIN_COVERAGE = 0.5
 GROUP_GAP_S = 2.0
+# The longest a singer holds one syllable. Past this, the voice still sounding
+# is the next thing the singer does -- an unwritten "ooh", a second take under
+# the mix -- and not this syllable going on. Without the cap the last word of a
+# line before a break highlights for the whole break.
+MAX_SUSTAIN_S = 2.5
 
 
 @dataclass
@@ -31,11 +36,17 @@ def _line_slots(
     line_words: list[TimedWord], voicing: Voicing | None, hard_limit: float
 ) -> tuple[list[Slot], float | None]:
     """Lay one line's words out as syllable slots, with the line's own pitch."""
-    # Every syllable of the line, with the span of the word it came from.
+    # Every syllable of the line, sharing the time from its word's start to the
+    # next word's. That is the time the singer actually has for it, and unlike
+    # the span the aligner drew round the word it is never zero -- an aligner
+    # that gives a word no duration would otherwise stack all its syllables on
+    # one instant, and the representation is meant to be a clock.
     spans: list[tuple[prosody.Syl, float, float]] = []
-    for w in line_words:
+    for k, w in enumerate(line_words):
         syls = prosody.pronunciations(w.text)[0]
-        step = (w.end - w.start) / len(syls)
+        nxt = line_words[k + 1].start if k + 1 < len(line_words) else w.end
+        until = nxt if nxt > w.start else w.end
+        step = (until - w.start) / len(syls)
         for i, s in enumerate(syls):
             spans.append((s, w.start + i * step, w.start + (i + 1) * step))
 
@@ -49,7 +60,7 @@ def _line_slots(
             sustain = voicing.offset_after(t, limit) - t
         else:
             sustain = min(nominal_end, limit) - t
-        sustain = max(sustain, 0.02)
+        sustain = min(max(sustain, 0.02), MAX_SUSTAIN_S)
         # A slot is a held note only if the performance holds it open. A schwa
         # or a stop-closed syllable that measures long is the aligner running
         # past the end of the note, not a sustain.
@@ -76,8 +87,15 @@ def _confidence(line_words: list[TimedWord], voicing: Voicing | None) -> float:
 
     A syllable simply being long is not one of them: that is a held note, and
     the representation records it as one.
+
+    The aligner's own doubt is averaged across the line, weighted by how many
+    slots each word is responsible for. Taking the worst word instead would
+    condemn a whole line for one shaky "the", which on a dense mix with backing
+    vocals is most of them -- and a line the aligner got eleven words right in
+    is not a line it has lost.
     """
-    conf = min(w.confidence for w in line_words)
+    weights = [len(prosody.pronunciations(w.text)[0]) for w in line_words]
+    conf = sum(w.confidence * n for w, n in zip(line_words, weights)) / sum(weights)
     if voicing is not None:
         cover = voicing.coverage(line_words[0].start, line_words[-1].end)
         if cover < MIN_COVERAGE:

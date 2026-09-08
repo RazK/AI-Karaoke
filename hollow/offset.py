@@ -9,18 +9,24 @@ separated vocal actually starts making sound.
 Two stages, and they measure different things on purpose. The coarse stage
 cross-correlates the word onsets against the vocal's spectral flux: sharp
 peaks, so it can tell one bar from the next, but late by around a tenth of a
-second, because flux measures the ramp of an attack rather than its start. The
-fine stage then paints the lyric as the stretches it claims the singer is
-sounding, and slides that against where the voice is actually sounding, within
-half a second of the coarse answer. Using both edges of every word -- where it
-starts and where it stops -- is what makes that stage unbiased: whatever lag the
-attack ramp adds at one end it takes away at the other.
+second, because flux measures the ramp of an attack and not its start. The fine
+stage then paints the lyric as the stretches it claims the singer is sounding
+and slides that against where the voice actually is, within half a second of
+the coarse answer. What makes that stage worth having is that it uses both
+edges of every word -- where it starts and where it stops -- so the lag the
+attack ramp adds at one end it takes back at the other.
 
-An earlier version refined against peak-picked note onsets instead. That does
-not work: there are several times more detected onsets than sung words, so
-whatever offset you propose has a note onset near it, and the median distance
-to the nearest one is near zero for every offset in the search. It could not
-correct the coarse stage's bias because it could not see it.
+Measured against the seeded songs, whose timings were hand-checked against
+these very recordings, this lands within 20 ms on three of four and about
+100 ms on the fourth; the same recording shifted by a known amount comes back
+within 10 ms. Roughly a tenth of a second is the floor: separation bleed,
+breath before a note and reverb after it all move where a vocal "starts".
+
+An earlier version refined against peak-picked note onsets instead. That cannot
+work: there are several times more detected onsets than sung words, so whatever
+offset you propose has a note onset near it and the median distance to the
+nearest one is near zero everywhere in the search. It could not correct the
+coarse stage's bias because it could not see it.
 """
 from __future__ import annotations
 

@@ -17,6 +17,13 @@ from .format import Hollow
 
 # ── karaoke files (LRC, plain and word-level) ──────────────────────────────
 
+# When a line's last word has no word after it, we know when it started and
+# not when it stopped. Allow it a word's worth of time rather than stretching
+# it to the next line -- a lyric that claims to be sung through every
+# instrumental break cannot be lined up against a recording, and the extractor
+# would read the break as one enormous held note.
+_UNKNOWN_WORD_S = 1.0
+
 _TAG = re.compile(r"\[(\d+):(\d+(?:[.:]\d+)?)\]")
 _WORD_TAG = re.compile(r"<(\d+):(\d+(?:[.:]\d+)?)>")
 _META = re.compile(r"\[(ti|ar|al|by|offset):([^\]]*)\]", re.I)
@@ -58,7 +65,8 @@ def parse_lrc(text: str) -> tuple[list[TimedWord], dict]:
             for k, (t, w) in enumerate(zip(stamps, texts)):
                 if not w:
                     continue
-                nxt = stamps[k + 1] if k + 1 < len(stamps) else end
+                nxt = stamps[k + 1] if k + 1 < len(stamps) else min(
+                    end, t + _UNKNOWN_WORD_S)
                 words.append(TimedWord(w, t, max(nxt, t + 0.05), i))
         else:
             ws = prosody.words(body)
@@ -109,9 +117,29 @@ def fetch_youtube(url: str, out_dir: str | Path, log=print) -> tuple[Path, dict]
             ["yt-dlp", "-f", "bestaudio", "--no-playlist", "-x", "--audio-format", "mp3",
              "-o", str(out_dir / f"{vid}.%(ext)s"), url],
             check=True, capture_output=True, text=True)
-    return mp3, {"id": vid, "title": info.get("track") or info.get("title", ""),
-                 "artist": info.get("artist") or info.get("uploader", ""),
+    title, artist = _tidy(info.get("title", ""), info.get("uploader", ""))
+    return mp3, {"id": vid,
+                 "title": info.get("track") or title,
+                 "artist": info.get("artist") or artist,
                  "url": url}
+
+
+_NOISE = re.compile(
+    r"\s*[\(\[][^)\]]*(official|video|audio|lyric|remaster|hd|4k|mv|visualiser|"
+    r"visualizer)[^)\]]*[\)\]]", re.I)
+
+
+def _tidy(video_title: str, uploader: str) -> tuple[str, str]:
+    """Get a song title out of a YouTube video title.
+
+    Uploaders write "Artist - Song (Official Video) (4K Remaster)". None of that
+    belongs on a card in the picker.
+    """
+    text = _NOISE.sub("", video_title).strip(" -–—|")
+    if " - " in text:
+        left, _, right = text.partition(" - ")
+        return right.strip(), left.strip()
+    return text, uploader
 
 
 _LINE_GAP_S = 0.45
@@ -131,24 +159,38 @@ def transcribe(vocals: str | Path, log=print, model: str = "small.en") -> list[T
     segments, _ = wm.transcribe(str(vocals), word_timestamps=True, vad_filter=True,
                                 beam_size=5, condition_on_previous_text=False)
 
+    # `line` holds whisper's own segment number for now: it phrases the vocal
+    # into breaths, which is most of what a lyric line is.
     flat: list[TimedWord] = []
-    for seg in segments:
+    for i, seg in enumerate(segments):
         for w in seg.words or []:
-            text = w.word.strip()
-            if text:
-                flat.append(TimedWord(text.strip(".,!?;:\"'"), w.start, w.end, 0,
-                                      round(float(w.probability), 3)))
+            # Store exactly the words the exam will find when it reads the line
+            # back: a token whisper writes as "2" is not a syllable anyone
+            # sings, and counting it would put the slots out by one. A word the
+            # aligner gave no time to is one it did not place, and its
+            # syllables have nowhere to go.
+            found = prosody.words(w.word)
+            if not found or w.end <= w.start:
+                continue
+            # Whisper hands back numpy scalars; the representation is a plain
+            # JSON file, so they become ordinary numbers here.
+            start, step = float(w.start), (float(w.end) - float(w.start)) / len(found)
+            for k, text in enumerate(found):
+                flat.append(TimedWord(text, start + k * step, start + (k + 1) * step,
+                                      i, round(float(w.probability), 3)))
     if not flat:
         return []
 
-    # Lines follow the singing: a pause, or a line that has already run long.
-    line, syllables = 0, 0
-    out = [flat[0]]
-    syllables = len(prosody.pronunciations(flat[0].text)[0])
+    # Lines follow the singing: a new breath, a pause inside one, or a line
+    # that has already run long. On a dense mix whisper returns its words
+    # butted up against each other, so the pause alone finds almost nothing.
+    line, syllables = 0, len(prosody.pronunciations(flat[0].text)[0])
+    out = [TimedWord(flat[0].text, flat[0].start, flat[0].end, 0, flat[0].confidence)]
     for prev, w in zip(flat, flat[1:]):
         n = len(prosody.pronunciations(w.text)[0])
         gap = w.start - prev.end
-        if gap >= _LINE_GAP_S or (syllables + n > _MAX_LINE_SYLLABLES and gap >= 0.15):
+        if (w.line != prev.line or gap >= _LINE_GAP_S
+                or (syllables + n > _MAX_LINE_SYLLABLES and gap >= 0.15)):
             line += 1
             syllables = 0
         syllables += n
