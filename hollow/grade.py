@@ -203,12 +203,21 @@ def honesty(h: Hollow, d: Dressing) -> tuple[float, int, list[int]]:
     An undeclared bend is worse than a declared one, and costs more.
     """
     declared = {b.line for b in d.bends}
-    actual = {
-        l.id
-        for l, text in zip(h.lines, d.lines)
-        if not l.uncertain
-        and len(prosody.syllables_for(text, len(l.slots))) != len(l.slots)
-    }
+    # What actually happened, recomputed from scratch: a line of the wrong
+    # length, or one whose stresses fall further out than the licence allows.
+    bar = 0.55 + 0.45 * d.licence
+    actual = set()
+    for line, text in zip(h.lines, d.lines):
+        if line.uncertain:
+            continue
+        syls = prosody.syllables_for(text, len(line.slots))
+        n = len(line.slots)
+        if len(syls) != n:
+            actual.add(line.id)
+            continue
+        hit = sum(s.stressed == slot.stress for s, slot in zip(syls, line.slots))
+        if hit / max(n, len(syls)) < bar:
+            actual.add(line.id)
     undeclared = sorted(actual - declared)
     n = max(len(h.lines), 1)
     return max(0.0, 1 - (len(declared & actual) / n) - 3.0 * len(undeclared) / n), len(declared), undeclared

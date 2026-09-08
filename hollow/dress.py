@@ -417,6 +417,7 @@ def dress(
     # Anything the writer did not answer, and everything at licence 0, falls
     # back to the closest phrase the corpus has. The song always plays.
     bends: list[Bend] = []
+    fell_back: set[int] = set()
     for k, line in enumerate(h.lines):
         want = len(line.slots)
         if line.id not in lines:
@@ -426,6 +427,7 @@ def dress(
                 bends.append(Bend(line.id, want, 0, "the corpus has nothing this size"))
                 continue
             lines[line.id] = cands[0].text
+            fell_back.add(line.id)
             used.update(range(cands[0].i, cands[0].j))
 
         lines[line.id] = _repair(lines[line.id], want)
@@ -433,10 +435,18 @@ def dress(
         if got != want:
             bends.append(Bend(
                 line.id, want, got,
-                "no phrase in the corpus fits this line"
-                if line.id in found or writer is None
-                else "the writer could not land it",
+                "no phrase in the corpus is this length"
+                if line.id in fell_back else "the writer could not land it",
             ))
+        elif line.id in fell_back:
+            # The syllables landed, but only because we took the nearest phrase
+            # the corpus had rather than one that actually fits the line: its
+            # stresses fall in the wrong places. That is a deviation and it gets
+            # declared, because a line of the right length with the stress in
+            # the wrong place is audibly wrong, and this list is where the
+            # corpus and the song genuinely would not meet.
+            bends.append(Bend(line.id, want, got,
+                              "nothing in the corpus fits this line's stresses"))
 
     ordered = [lines[l.id] for l in h.lines]
     return Dressing(
