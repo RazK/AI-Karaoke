@@ -283,6 +283,7 @@ function openRate() {
         : `Thanks. The exam said ${r.machine.toFixed(1)}, so you are close to agreeing.`;
       [...$('stars').children].forEach(el => el.classList.remove('pick'));
       b.classList.add('pick');
+      loadDisagreements();
     };
     $('stars').append(b);
   }
@@ -292,5 +293,24 @@ function openRate() {
 const closeSheets = () =>
   document.querySelectorAll('.sheet').forEach(s => s.classList.remove('on'));
 
+// A disagreement means the exam is measuring the wrong thing. They are shown,
+// counted, and left alone.
+async function loadDisagreements() {
+  const rows = await api('/api/disagreements');
+  $('disagree-link').style.display = rows.length ? 'block' : 'none';
+  $('disagree-n').textContent = rows.length ? `(${rows.length})` : '';
+  return rows;
+}
+
+async function openDisagreements() {
+  const rows = await loadDisagreements();
+  $('disagree-body').innerHTML = rows.map(r => metric(
+    `${esc(r.song)}`,
+    `${r.human} vs ${r.machine.toFixed(1)}`,
+    `${esc(r.dressing)} — ${r.gap.toFixed(1)} points apart`)).join('');
+  $('disagree').classList.add('on');
+}
+
 licenceLabel(0);
 loadLibrary();
+loadDisagreements();

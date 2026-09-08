@@ -167,10 +167,14 @@ Answer one line per row, exactly "<number>: yes" or "<number>: no". Nothing else
 
 
 def _looks_like_a_fragment(line: str) -> bool:
+    """A weak local check: does the line stop in mid-air?
+
+    Only the ending is evidence. Almost every English sentence starts with a
+    pronoun, a determiner or a conjunction, so an opening rule flags "I want my
+    money back" and "Our server rolled his eyes" and tells you nothing.
+    """
     ws = [w.lower() for w in prosody.words(line)]
-    if not ws:
-        return True
-    return ws[-1] in DANGLING or (len(ws) > 1 and ws[0] in DANGLING - {"the", "a", "an", "and", "but", "so", "no", "not"})
+    return not ws or ws[-1] in DANGLING
 
 
 def grammar(lines: list[str], writer=None) -> tuple[float, list[int], str]:

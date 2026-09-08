@@ -178,7 +178,21 @@ input:focus,textarea:focus{outline:none;border-color:var(--hot)}
 
     <div id="work"><div class="what"><span class="spin"></span><span id="what"></span></div>
       <pre id="log"></pre></div>
+
+    <div id="disagree-link" style="display:none;margin-top:26px">
+      <button class="ghost" onclick="openDisagreements()">
+        Where you and the exam disagree <span id="disagree-n"></span></button>
+    </div>
   </div>
+
+  <div class="sheet" id="disagree"><div class="box">
+    <div class="big" style="font-size:19px">Where you and the exam disagree</div>
+    <p class="note" style="margin-top:10px">More than two points apart. That means
+      the exam is measuring the wrong thing on these, not that you are wrong.
+      Nothing is refitted automatically — the weights are a starting point.</p>
+    <div id="disagree-body" style="margin-top:14px"></div>
+    <button class="ghost" style="margin-top:16px;width:100%" onclick="closeSheets()">Close</button>
+  </div></div>
 </section>
 
 <div class="bar" id="bar">
