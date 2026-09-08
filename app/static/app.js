@@ -150,11 +150,16 @@ async function openSong(ref, name) {
   rows = song.lines.map((l, i) => {
     const el = document.createElement('div');
     el.className = 'ln' + (l.uncertain ? ' unsure' : '');
-    el.innerHTML = `<div class="orig">${esc(l.original)}</div><div class="txt">${
+    const ow = l.owords || [];
+    el.innerHTML = `<div class="orig">${
+      ow.length ? ow.map(w => `<span class="ow">${esc(w.w)}</span>`).join(' ')
+                : esc(l.original)}</div><div class="txt">${
       d.words[i].map(w => `<span class="w">${esc(w.w)}</span>`).join(' ')}</div>`;
     el.onclick = () => { au.currentTime = Math.max(0, l.start - 0.3); };
     $('inner').append(el);
-    return { el, line: l, words: d.words[i], spans: [...el.querySelectorAll('.w')] };
+    return { el, line: l, words: d.words[i], owords: ow,
+             spans: [...el.querySelectorAll('.txt .w')],
+             ospans: [...el.querySelectorAll('.orig .ow')] };
   });
 
   au.src = `/api/audio/${ref}?track=instrumental`;
@@ -221,6 +226,7 @@ function tick() {
     rows.forEach((r, k) => {
       r.el.className = 'ln' + (r.line.uncertain ? ' unsure' : '')
         + (k === i ? ' on' : k < i ? ' done' : ' ahead')
+        + (k === i + 1 ? ' next' : '')
         + (Math.abs(k - i) > 3 ? ' far' : '');
     });
     const target = rows[Math.max(i, 0)];
@@ -233,6 +239,12 @@ function tick() {
   if (i >= 0) {
     const r = rows[i];
     r.words.forEach((w, k) => r.spans[k].classList.toggle('lit', t >= w.t));
+    // The original lights in step with the rewrite. Both sets of words sit on
+    // the same slots, so watching them together is how you see which new word
+    // takes the place of which old one -- which is the thing you sing from.
+    r.owords.forEach((w, k) => {
+      if (r.ospans[k]) r.ospans[k].classList.toggle('lit', t >= w.t);
+    });
   }
 }
 

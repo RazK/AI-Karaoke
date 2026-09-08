@@ -85,17 +85,23 @@ input:focus,textarea:focus{outline:none;border-color:var(--hot)}
   to bottom,transparent,#000 16%,#000 84%,transparent)}
 #inner{position:absolute;left:0;right:0;top:50%;will-change:transform}
 .ln{padding:9px 20px;text-align:center;transition:opacity .3s}
-.ln .orig{font-size:12px;color:#3f6b66;letter-spacing:.01em;margin-bottom:5px;
-  min-height:15px}
+.ln .orig{font-size:clamp(14px,2.6vw,21px);color:#2e5b56;letter-spacing:.005em;
+  margin-bottom:7px;min-height:17px;font-weight:600;line-height:1.25}
+.ln .orig .ow{color:#2e5b56;transition:color .1s}
 .ln .txt{font-size:clamp(22px,6.5vw,40px);font-weight:800;letter-spacing:-.015em;
   line-height:1.2;overflow-wrap:break-word}
 .ln .w{color:#3a3a52;transition:color .1s}
 .ln.on{padding:16px 20px}
-.ln.on .orig{color:#3fa89c}
+.ln.on .orig{color:#2f7d74}
+.ln.on .orig .ow{color:#2f7d74}
+.ln.on .orig .ow.lit{color:#7defdc;text-shadow:0 0 15px rgba(45,212,191,.45)}
 .ln.on .w.lit{color:#fff;text-shadow:0 0 22px rgba(168,85,247,.75)}
 .ln.done .w{color:rgba(255,255,255,.26)}
 .ln.done .txt,.ln.ahead .txt{font-size:clamp(14px,2.4vw,21px);font-weight:650}
 .ln.done .orig,.ln.ahead .orig{display:none}
+/* the line you are about to sing keeps its original visible, so there is time
+   to see the tune coming rather than meeting it on the beat */
+.ln.next .orig{display:block;font-size:clamp(12px,1.9vw,15px);color:#24504b}
 .ln.ahead .w{color:#565676}
 .ln.far{opacity:.45}
 .ln.unsure .txt::after{content:"?";color:var(--warn);font-size:.55em;

@@ -98,12 +98,17 @@ def song(ref: str):
         raise HTTPException(404, "no such song")
     h = lib.hollow(ref)
     originals = lib.originals(ref)
+    owords = word_times(h, originals) if originals else []
     return {
         "song": s.__dict__,
         "lines": [
             {"id": l.id, "group": l.group, "start": l.start, "end": l.end,
              "slots": len(l.slots), "uncertain": l.uncertain,
-             "original": originals[l.id] if l.id < len(originals) else ""}
+             "original": originals[l.id] if l.id < len(originals) else "",
+             # The original's words on the same slots the rewrite uses, so the
+             # player can light both in step and you can see which new word
+             # goes where the old one went.
+             "owords": owords[l.id] if l.id < len(owords) else []}
             for l in h.lines
         ],
         "dressings": [d["name"] for d in lib.dressings(ref)],
