@@ -113,8 +113,12 @@ def fetch_youtube(url: str, out_dir: str | Path, log=print) -> tuple[Path, dict]
     mp3 = out_dir / f"{vid}.mp3"
     if not mp3.exists():
         log(f"downloading audio for {vid}")
+        # Pinned format: "bestaudio" can hand back a different encoding on a
+        # later day, and different audio means different stems and a different
+        # transcript.
         subprocess.run(
-            ["yt-dlp", "-f", "bestaudio", "--no-playlist", "-x", "--audio-format", "mp3",
+            ["yt-dlp", "-f", "bestaudio[ext=webm]/bestaudio", "--no-playlist",
+             "-x", "--audio-format", "mp3", "--audio-quality", "0",
              "-o", str(out_dir / f"{vid}.%(ext)s"), url],
             check=True, capture_output=True, text=True)
     title, artist = _tidy(info.get("title", ""), info.get("uploader", ""))
@@ -155,9 +159,14 @@ def transcribe(vocals: str | Path, log=print, model: str = "small.en") -> list[T
     from faster_whisper import WhisperModel
 
     log(f"transcribing the vocal locally with whisper {model} (first run downloads it)")
-    wm = WhisperModel(model, device="cpu", compute_type="int8")
+    # Pinned so that transcribing the same stem twice gives the same lines.
+    # It does not by default: the temperature fallback ladder and a variable
+    # thread count both move the result, and a song whose lines shift under you
+    # invalidates every rewrite already written against it.
+    wm = WhisperModel(model, device="cpu", compute_type="int8", cpu_threads=4)
     segments, _ = wm.transcribe(str(vocals), word_timestamps=True, vad_filter=True,
-                                beam_size=5, condition_on_previous_text=False)
+                                beam_size=5, condition_on_previous_text=False,
+                                temperature=0.0)
 
     # `line` holds whisper's own segment number for now: it phrases the vocal
     # into breaths, which is most of what a lyric line is.
