@@ -6,20 +6,33 @@ first line's timestamp is exactly what fails on a track that opens with several
 seconds of near-silence, so instead we line the whole lyric up against where the
 separated vocal actually starts making sound.
 
-Two stages. A coarse cross-correlation of every word onset against the vocal's
-spectral flux finds the shift to within a note or so. Then a fine pass takes the
-median distance from each shifted word onset to the nearest detected note onset,
-which removes the tenth of a second the flux peak sits behind the attack.
+Two stages, and they measure different things on purpose. The coarse stage
+cross-correlates the word onsets against the vocal's spectral flux: sharp
+peaks, so it can tell one bar from the next, but late by around a tenth of a
+second, because flux measures the ramp of an attack rather than its start. The
+fine stage then paints the lyric as the stretches it claims the singer is
+sounding, and slides that against where the voice is actually sounding, within
+half a second of the coarse answer. Using both edges of every word -- where it
+starts and where it stops -- is what makes that stage unbiased: whatever lag the
+attack ramp adds at one end it takes away at the other.
+
+An earlier version refined against peak-picked note onsets instead. That does
+not work: there are several times more detected onsets than sung words, so
+whatever offset you propose has a note onset near it, and the median distance
+to the nearest one is near zero for every offset in the search. It could not
+correct the coarse stage's bias because it could not see it.
 """
 from __future__ import annotations
 
 import numpy as np
 
-from .audio import SR, Voicing
+from .audio import Voicing
 
 SEARCH_BACK_S = 10.0
 SEARCH_FORWARD_S = 30.0
-FINE_WINDOW_S = 0.25
+FINE_WINDOW_S = 0.5
+# Below this the lyric is sitting on silence and the answer means nothing.
+MIN_AGREEMENT = 0.5
 
 
 def _impulses(onsets: np.ndarray, n: int, hop: float) -> np.ndarray:
@@ -31,49 +44,62 @@ def _impulses(onsets: np.ndarray, n: int, hop: float) -> np.ndarray:
     return np.convolve(imp, np.hanning(11), mode="same")
 
 
-def estimate(
-    onsets: list[float], voicing: Voicing, duration: float
-) -> tuple[float, bool]:
-    """Return (seconds to add to the lyric times, whether we believe it)."""
+def _claimed(spans: list[tuple[float, float]], n: int, hop: float) -> np.ndarray:
+    """Where the lyric says the singer is sounding, as a 0/1 frame mask."""
+    m = np.zeros(n, dtype=np.float32)
+    for start, end in spans:
+        i, j = int(start / hop), int(end / hop)
+        if j > 0:
+            m[max(0, i) : min(n, j)] = 1.0
+    return m
+
+
+def _peak(sig: np.ndarray, ref: np.ndarray, hop: float, lo: float, hi: float):
+    """Lag in seconds that best lines `ref` up with `sig`, and how clear it is."""
     from scipy.signal import correlate
 
-    hop, n = voicing.hop, len(voicing.rms)
-    onsets = np.asarray([t for t in onsets if 0 <= t < duration], dtype=np.float64)
-    if len(onsets) < 5 or n < 10:
-        return 0.0, False
-
-    sig = voicing.flux - voicing.flux.mean()
-    imp = _impulses(onsets, n, hop)
-    imp = imp - imp.mean()
-    corr = correlate(sig, imp, mode="full", method="fft")
-    lags = np.arange(-len(imp) + 1, len(sig))
-    keep = (lags >= -SEARCH_BACK_S / hop) & (lags <= SEARCH_FORWARD_S / hop)
+    a, b = sig - sig.mean(), ref - ref.mean()
+    corr = correlate(a, b, mode="full", method="fft")
+    lags = np.arange(-len(b) + 1, len(a)) * hop
+    keep = (lags >= lo) & (lags <= hi)
     corr, lags = corr[keep], lags[keep]
     if not len(corr):
-        return 0.0, False
-
+        return None, 0.0
     best = int(np.argmax(corr))
-    coarse = float(lags[best] * hop)
-    far = np.abs(lags - lags[best]) > 1.0 / hop
+    far = np.abs(lags - lags[best]) > 1.0
     runner_up = float(corr[far].max()) if far.any() else 0.0
     ratio = float(corr[best]) / runner_up if runner_up > 0 else 0.0
+    return float(lags[best]), ratio
 
-    # Fine pass: sit each shifted onset next to the nearest note the vocal
-    # actually plays, and take the median disagreement.
-    peaks = voicing.onset_times
-    fine, matched = 0.0, 0
-    if len(peaks):
-        diffs = []
-        for t in onsets + coarse:
-            j = int(np.argmin(np.abs(peaks - t)))
-            if abs(peaks[j] - t) < FINE_WINDOW_S:
-                diffs.append(peaks[j] - t)
-        matched = len(diffs)
-        if matched >= max(8, 0.2 * len(onsets)):
-            fine = float(np.median(diffs))
 
-    confident = ratio > 1.15 and matched >= 0.2 * len(onsets)
-    return round(coarse + fine, 3), bool(confident)
+def estimate(
+    spans: list[tuple[float, float]], voicing: Voicing, duration: float
+) -> tuple[float, bool]:
+    """Return (seconds to add to the lyric times, whether we believe it)."""
+    hop, n = voicing.hop, len(voicing.rms)
+    spans = sorted((s, e) for s, e in spans if 0 <= s < duration and e > s)
+    if len(spans) < 5 or n < 10:
+        return 0.0, False
+
+    onsets = np.asarray([s for s, _ in spans])
+    coarse, ratio = _peak(voicing.flux, _impulses(onsets, n, hop), hop,
+                          -SEARCH_BACK_S, SEARCH_FORWARD_S)
+    if coarse is None:
+        return 0.0, False
+
+    activity = voicing.activity()
+    claimed = _claimed(spans, n, hop)
+    fine, _ = _peak(activity, claimed, hop,
+                    coarse - FINE_WINDOW_S, coarse + FINE_WINDOW_S)
+    best = fine if fine is not None else coarse
+
+    # How much of what the lyric claims is sung actually is, once shifted. A
+    # lyric lying over silence gets a confident-looking correlation peak and is
+    # still in the wrong place.
+    k = int(round(best / hop))
+    lined_up = np.roll(claimed, k) > 0
+    agreement = float(activity[lined_up].mean()) if lined_up.any() else 0.0
+    return round(best, 3), bool(ratio > 1.15 and agreement >= MIN_AGREEMENT)
 
 
 def shift(words, seconds: float):

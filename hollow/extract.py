@@ -29,8 +29,8 @@ class TimedWord:
 
 def _line_slots(
     line_words: list[TimedWord], voicing: Voicing | None, hard_limit: float
-) -> list[Slot]:
-    """Lay one line's words out as syllable slots."""
+) -> tuple[list[Slot], float | None]:
+    """Lay one line's words out as syllable slots, with the line's own pitch."""
     # Every syllable of the line, with the span of the word it came from.
     spans: list[tuple[prosody.Syl, float, float]] = []
     for w in line_words:
@@ -57,11 +57,13 @@ def _line_slots(
         pitch = voicing.median_f0(t, t + sustain) if voicing is not None else None
         slots.append(Slot(round(t, 3), round(sustain, 3), syl.stressed, pitch, hold))
 
-    # Melody, as semitones from the first pitched slot of the line.
+    # Melody, as semitones from the first pitched slot of the line. That slot's
+    # own frequency goes back to the caller: without it every line reads as
+    # starting at zero and the melodic relation between lines is lost.
     ref = next((s.pitch for s in slots if s.pitch), None)
     for s in slots:
         s.pitch = semitones(s.pitch, ref) if (s.pitch and ref) else None
-    return slots
+    return slots, (round(ref, 1) if ref else None)
 
 
 def _confidence(line_words: list[TimedWord], voicing: Voicing | None) -> float:
@@ -112,10 +114,11 @@ def build(
         lw = sorted(by_line[i], key=lambda w: w.start)
         nxt = by_line[order[k + 1]][0].start if k + 1 < len(order) else duration
         limit = min(lw[-1].end + 2.0, nxt, duration)
-        slots = _line_slots(lw, voicing, max(limit, lw[-1].start + 0.05))
+        slots, ref_hz = _line_slots(lw, voicing, max(limit, lw[-1].start + 0.05))
         if not slots:
             continue
-        lines.append(Line(len(lines), 0, slots, labels[k], _confidence(lw, voicing)))
+        lines.append(Line(len(lines), 0, slots, labels[k], _confidence(lw, voicing),
+                          ref_hz))
 
     # Phrase groups: a gap in the singing starts a new one.
     groups: list[list[int]] = []

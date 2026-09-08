@@ -51,6 +51,10 @@ class Line:
     slots: list[Slot]
     rhyme: str  # class label; lines sharing a label rhyme with each other
     confidence: float = 1.0
+    # Absolute pitch of this line's first pitched slot. Slot.pitch is relative
+    # to it, which is what a writer wants to read; this is what a synthesiser
+    # needs so that line 2 sits where it should against line 1.
+    ref_hz: float | None = None
 
     @property
     def start(self) -> float:
@@ -110,6 +114,7 @@ class Hollow:
                 group=l["group"],
                 rhyme=l["rhyme"],
                 confidence=l.get("confidence", 1.0),
+                ref_hz=l.get("ref_hz"),
                 slots=[Slot(**s) for s in l["slots"]],
             )
             for l in d["lines"]

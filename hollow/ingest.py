@@ -184,7 +184,8 @@ def ingest(
         words, _ = parse_lrc(lrc)
         if not words:
             raise ValueError("no timed lines in that karaoke file")
-        shift, sure = offset_mod.estimate([w.start for w in words], voicing, dur)
+        shift, sure = offset_mod.estimate(
+            [(w.start, w.end) for w in words], voicing, dur)
         log(f"karaoke file sits {shift:+.2f}s from this recording"
             + ("" if sure else " (uncertain — nudge it in the player)"))
         words = offset_mod.shift(words, shift)

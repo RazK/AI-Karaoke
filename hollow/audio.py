@@ -77,7 +77,6 @@ class Voicing:
     f0: np.ndarray  # hertz, NaN where unvoiced
     floor: float  # rms below this is silence
     flux: np.ndarray = None  # where the vocal is getting louder — note attacks
-    onset_times: np.ndarray = None  # seconds of each detected note attack
 
     def voiced(self, t: float) -> bool:
         i = int(t / self.hop)
@@ -136,13 +135,9 @@ def analyse(vocals: str | Path, hop_s: float = 0.01) -> Voicing:
 
     db = librosa.amplitude_to_db(rms, ref=np.max(rms))
     flux = np.maximum(0.0, np.diff(np.maximum(db, -60.0), prepend=db[0]))
-    strength = librosa.onset.onset_strength(y=y, sr=SR, hop_length=hop)
-    peaks = librosa.util.peak_pick(strength, pre_max=3, post_max=3, pre_avg=5,
-                                   post_avg=5, delta=0.3, wait=5)
 
     n = min(len(rms), len(f0), len(flux))
-    return Voicing(hop=hop / SR, rms=rms[:n], f0=f0[:n], floor=floor,
-                   flux=flux[:n], onset_times=peaks * (hop / SR))
+    return Voicing(hop=hop / SR, rms=rms[:n], f0=f0[:n], floor=floor, flux=flux[:n])
 
 
 def semitones(hz: float, ref: float) -> int:

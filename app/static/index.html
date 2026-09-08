@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI Karaoke</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%8E%A4%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#0b0b11; --panel:#15151f; --edge:#262633; --ink:#f2f2f7;
+  --dim:#7b7b8f; --dimmer:#4a4a5c; --hot:#a855f7; --hot2:#22d3ee; --warn:#fbbf24;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--ink); font:16px/1.45 -apple-system,BlinkMacSystemFont,
+  "Segoe UI",Roboto,Helvetica,Arial,sans-serif; overflow:hidden;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+.screen{position:absolute;inset:0;display:none;flex-direction:column}
+.screen.on{display:flex}
+
+/* ── setup ────────────────────────────────────────────────────────────── */
+#setup{overflow-y:auto;padding:24px 20px 190px}
+.wrap{max-width:820px;margin:0 auto;width:100%}
+h1{font-size:26px;font-weight:800;letter-spacing:-.02em}
+h1 span{color:var(--hot)}
+.sub{color:var(--dim);margin-top:4px;font-size:14px}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim);
+   margin:30px 0 10px;font-weight:700}
+.cards{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+.card{background:var(--panel);border:1px solid var(--edge);border-radius:12px;
+  padding:12px 14px;text-align:left;transition:.15s;display:block;width:100%}
+.card:hover{border-color:#3d3d52}
+.card.sel{border-color:var(--hot);background:#1d1430;box-shadow:0 0 0 1px var(--hot)}
+.card b{display:block;font-size:15px;font-weight:650;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card small{color:var(--dim);font-size:12.5px}
+.tag{display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--dim);border:1px solid var(--edge);border-radius:5px;padding:1px 5px;margin-left:6px}
+textarea,input[type=text],input[type=url]{
+  width:100%;background:var(--panel);border:1px solid var(--edge);border-radius:10px;
+  color:var(--ink);padding:11px 13px;font:inherit;font-size:14px}
+textarea{min-height:96px;resize:vertical}
+input:focus,textarea:focus{outline:none;border-color:var(--hot)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.go{background:var(--hot);color:#fff;font-weight:700;border-radius:11px;
+  padding:14px 22px;font-size:16px}
+.go:disabled{background:#33333f;color:var(--dimmer);cursor:default}
+.ghost{border:1px solid var(--edge);border-radius:10px;padding:9px 14px;font-size:14px;
+  color:var(--dim)}
+.ghost:hover{color:var(--ink);border-color:#3d3d52}
+.bar{position:fixed;left:0;right:0;bottom:0;background:rgba(11,11,17,.94);
+  border-top:1px solid var(--edge);backdrop-filter:blur(12px);
+  padding:14px 20px calc(18px + env(safe-area-inset-bottom))}
+.bar .wrap{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+
+/* licence dial */
+.dial{flex:1;min-width:230px}
+.dial input{width:100%;accent-color:var(--hot)}
+.dial .ends{display:flex;justify-content:space-between;font-size:11px;color:var(--dimmer)}
+.dial .now{font-size:12.5px;color:var(--dim);margin-bottom:2px}
+.dial .now b{color:var(--ink)}
+
+/* progress */
+#work{display:none;margin-top:16px;background:var(--panel);border:1px solid var(--edge);
+  border-radius:12px;padding:14px 16px}
+#work.on{display:block}
+#work .what{font-weight:650;display:flex;align-items:center;gap:9px}
+.spin{width:13px;height:13px;border:2px solid var(--edge);border-top-color:var(--hot);
+  border-radius:50%;animation:sp .7s linear infinite;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+#work pre{margin-top:9px;color:var(--dim);font-size:12.5px;white-space:pre-wrap;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.6}
+.err{color:#f87171}
+
+/* ── player ───────────────────────────────────────────────────────────── */
+#play{background:radial-gradient(120% 80% at 50% 0%,#191228 0%,var(--bg) 62%)}
+.top{display:flex;align-items:center;gap:12px;padding:14px 18px;flex:none}
+.top .name{flex:1;min-width:0}
+.top .name b{display:block;font-size:15px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.top .name small{color:var(--dim);font-size:12px}
+#rail{flex:1;position:relative;overflow:hidden;mask-image:linear-gradient(
+  to bottom,transparent,#000 16%,#000 84%,transparent)}
+#inner{position:absolute;left:0;right:0;top:50%;will-change:transform}
+.ln{padding:9px 20px;text-align:center;transition:opacity .3s}
+.ln .orig{font-size:12px;color:#3f6b66;letter-spacing:.01em;margin-bottom:5px;
+  min-height:15px}
+.ln .txt{font-size:clamp(22px,6.5vw,40px);font-weight:800;letter-spacing:-.015em;
+  line-height:1.2;overflow-wrap:break-word}
+.ln .w{color:#3a3a52;transition:color .1s}
+.ln.on{padding:16px 20px}
+.ln.on .orig{color:#3fa89c}
+.ln.on .w.lit{color:#fff;text-shadow:0 0 22px rgba(168,85,247,.75)}
+.ln.done .w{color:rgba(255,255,255,.22)}
+.ln.done .txt,.ln.ahead .txt{font-size:clamp(14px,2.4vw,21px);font-weight:650}
+.ln.done .orig,.ln.ahead .orig{display:none}
+.ln.ahead .w{color:#2c2c40}
+.ln.far{opacity:.32}
+.ln.unsure .txt::after{content:"?";color:var(--warn);font-size:.55em;
+  vertical-align:super;margin-left:5px}
+#count{text-align:center;font-size:34px;color:var(--hot);letter-spacing:.32em;
+  height:44px}
+
+/* transport */
+.deck{flex:none;padding:12px 18px calc(16px + env(safe-area-inset-bottom));
+  background:rgba(11,11,17,.9);border-top:1px solid var(--edge);backdrop-filter:blur(12px)}
+.deck .wrap{display:flex;flex-direction:column;gap:9px}
+.seek{display:flex;align-items:center;gap:11px;font-size:11.5px;color:var(--dim);
+  font-variant-numeric:tabular-nums}
+.seek input{flex:1;accent-color:var(--hot)}
+.ctl{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap}
+.pp{width:52px;height:52px;border-radius:50%;background:var(--hot);color:#fff;
+  font-size:19px;display:grid;place-items:center;flex:none}
+.nudge{display:flex;align-items:center;gap:2px;border:1px solid var(--edge);
+  border-radius:10px;padding:3px}
+.nudge button{padding:7px 12px;font-size:15px;border-radius:7px;color:var(--dim)}
+.nudge button:hover{background:var(--panel);color:var(--ink)}
+.nudge .val{font-size:12px;color:var(--dim);min-width:66px;text-align:center;
+  font-variant-numeric:tabular-nums}
+.nudge .val b{color:var(--ink)}
+
+/* card + rating */
+.sheet{position:absolute;inset:0;background:rgba(6,6,11,.93);backdrop-filter:blur(9px);
+  display:none;place-items:center;padding:22px;overflow-y:auto;z-index:5}
+.sheet.on{display:grid}
+.sheet .box{background:var(--panel);border:1px solid var(--edge);border-radius:16px;
+  padding:22px;max-width:560px;width:100%}
+.metric{display:flex;justify-content:space-between;gap:14px;padding:9px 0;
+  border-bottom:1px solid var(--edge);font-size:14px}
+.metric:last-child{border:none}
+.metric span{color:var(--dim)}
+.metric b{font-variant-numeric:tabular-nums}
+.big{font-size:46px;font-weight:800;text-align:center;letter-spacing:-.02em}
+.big small{display:block;font-size:12px;color:var(--dim);font-weight:500;
+  letter-spacing:.06em;text-transform:uppercase;margin-top:2px}
+.stars{display:flex;gap:5px;justify-content:center;flex-wrap:wrap;margin:14px 0}
+.stars button{width:38px;height:38px;border-radius:9px;border:1px solid var(--edge);
+  font-size:14px;color:var(--dim)}
+.stars button:hover,.stars button.pick{background:var(--hot);color:#fff;border-color:var(--hot)}
+.note{font-size:12.5px;color:var(--dim);line-height:1.6}
+.bend{font-size:12.5px;color:var(--warn);margin-top:3px}
+@media(max-width:520px){ .top{padding:10px 14px} .deck{padding:10px 14px} }
+</style>
+</head>
+<body>
+
+<!-- ══ setup ══ -->
+<section id="setup" class="screen on">
+  <div class="wrap">
+    <h1>AI <span>Karaoke</span></h1>
+    <p class="sub">Pick a song. Pick something absurd to sing instead of the words.</p>
+
+    <h2>Song</h2>
+    <div id="songs" class="cards"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="ghost" onclick="toggle('add')">+ Add a song</button>
+    </div>
+    <div id="add" style="display:none;margin-top:10px">
+      <div class="row" style="margin-bottom:8px">
+        <input type="url" id="yt" placeholder="Paste a YouTube URL" style="flex:1;min-width:220px">
+        <button class="ghost" onclick="addYouTube()">Fetch</button>
+      </div>
+      <p class="note">Or import a karaoke file with the recording it belongs to:</p>
+      <div class="row" style="margin-top:7px">
+        <input type="file" id="lrc" accept=".lrc,.txt">
+        <input type="file" id="aud" accept="audio/*">
+        <button class="ghost" onclick="addKaraoke()">Import</button>
+      </div>
+    </div>
+
+    <h2>Words to sing instead</h2>
+    <div id="corpora" class="cards"></div>
+    <div style="margin-top:10px">
+      <textarea id="own" placeholder="…or paste any text at all in here"></textarea>
+    </div>
+
+    <div id="work"><div class="what"><span class="spin"></span><span id="what"></span></div>
+      <pre id="log"></pre></div>
+  </div>
+</section>
+
+<div class="bar" id="bar">
+  <div class="wrap">
+    <div class="dial">
+      <div class="now">Licence <b id="licv">0.00</b> — <span id="licd"></span></div>
+      <input type="range" id="lic" min="0" max="1" step="0.05" value="0">
+      <div class="ends"><span>faithful to the text</span><span>freely rewritten</span></div>
+    </div>
+    <button class="go" id="make" onclick="make()" disabled>Make the song</button>
+  </div>
+</div>
+
+<!-- ══ player ══ -->
+<section id="play" class="screen">
+  <div class="top">
+    <button class="ghost" onclick="back()">‹ Back</button>
+    <div class="name"><b id="ptitle"></b><small id="psub"></small></div>
+    <button class="ghost" onclick="openCard()">Score</button>
+  </div>
+  <div id="rail"><div id="inner"></div></div>
+  <div class="deck"><div class="wrap">
+    <div class="seek">
+      <span id="tnow">0:00</span>
+      <input type="range" id="seek" min="0" max="1000" value="0">
+      <span id="tend">0:00</span>
+    </div>
+    <div class="ctl">
+      <div class="nudge">
+        <button onclick="nudge(-50)" title="lyrics earlier">◀</button>
+        <span class="val">lyrics <b id="off">0 ms</b></span>
+        <button onclick="nudge(50)" title="lyrics later">▶</button>
+      </div>
+      <button class="pp" id="pp" onclick="toggleplay()">▶</button>
+      <button class="ghost" onclick="openRate()">Rate it</button>
+    </div>
+  </div></div>
+
+  <div class="sheet" id="card"><div class="box">
+    <div class="big" id="cscore">—<small>singability</small></div>
+    <div id="cbody" style="margin-top:16px"></div>
+    <button class="ghost" style="margin-top:16px;width:100%" onclick="closeSheets()">Close</button>
+  </div></div>
+
+  <div class="sheet" id="rateSheet"><div class="box">
+    <div class="big" style="font-size:20px">How was that, out of ten?</div>
+    <div class="stars" id="stars"></div>
+    <p class="note" id="rateNote">The exam is a starting point, not a settled answer.
+      When your score and its score are more than two points apart, that song gets
+      flagged — it means the exam is measuring the wrong thing.</p>
+    <button class="ghost" style="margin-top:14px;width:100%" onclick="closeSheets()">Close</button>
+  </div></div>
+</section>
+
+<audio id="au"></audio>
+<script src="/static/app.js"></script>
+</body>
+</html>
