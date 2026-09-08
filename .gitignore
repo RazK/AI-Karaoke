@@ -69,3 +69,10 @@ __pycache__/
 # agent / tooling (do not commit)
 logs/
 scripts/
+
+# hollow pipeline artifacts.
+# library/ holds extracted songs: audio, stems and the original lyric. The
+# original lyric stays on the machine that extracted it and is never committed.
+library/
+.work/
+karaoke/
