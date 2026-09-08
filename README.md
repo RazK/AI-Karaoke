@@ -141,6 +141,13 @@ tests/           49 tests, including the acceptance tests
 docs/            prior art, and one page on what this turned out to be
 ```
 
+## Licensing
+
+The seeded songs are freely licensed but not identically: two are **CC BY-ND**,
+so a karaoke rendition of them is fine on your own machine and must not be
+published. `LICENSING.md` has the table and what the handover archive does and
+does not contain.
+
 ## What is not committed
 
 `library/` holds extracted songs — audio, stems and the original lyric. The

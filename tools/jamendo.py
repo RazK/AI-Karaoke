@@ -76,6 +76,12 @@ def seed(song_id: str, title: str, artist: str, lib: Library, log=print) -> str:
         log(f"wrote {lrc_path}")
     mp3 = download_mp3(song_id, KARAOKE / f"{song_id}.mp3")
 
+    licence = next((r["LicenseType"] for r in english_songs()
+                    if Path(r["Filepath"]).stem == song_id), "?")
+    log(f"{title} — {artist} is licensed {licence}"
+        + ("  (no derivatives: play it locally, do not publish the instrumental)"
+           if "ND" in licence else ""))
+
     h, originals, instrumental, mix = ingest(
         mp3, lrc=lrc_path.read_text(encoding="utf-8"),
         source_kind="karaoke_file", work_dir=Path(".work") / song_id, log=log,

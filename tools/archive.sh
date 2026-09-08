@@ -18,8 +18,8 @@ STAGE=$OUT/ai-karaoke
 rm -rf "$STAGE"; mkdir -p "$STAGE"
 
 echo "== code, app, setup"
-for p in hollow app sing tools tests data docs README.md AGENTS.md setup.sh \
-         requirements.txt .env.example .gitignore; do
+for p in hollow app sing tools tests data docs README.md AGENTS.md LICENSING.md \
+         setup.sh requirements.txt .env.example .gitignore; do
   cp -r "$p" "$STAGE/"
 done
 find "$STAGE" -name __pycache__ -type d -prune -exec rm -rf {} +
@@ -64,6 +64,8 @@ In this archive:
 - `demo/original.mp3`, `demo/dressed.mp3` — a synthetic voice singing a song and
   then singing an IKEA manual, both from the representation alone
 - `AGENTS.md` — the working rules, including the one that is not negotiable
+- `LICENSING.md` — which songs allow what. Two are no-derivatives: play them
+  locally, do not publish their separated instrumentals
 EOF
 
 mkdir -p "$OUT"

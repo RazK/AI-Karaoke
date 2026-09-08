@@ -78,5 +78,15 @@ this build environment's IP is bot-flagged by YouTube and 50-odd modern tracks
 were refused. The one that worked is dense and heavily layered, which is the
 property that matters, but "works on modern pop" rests on a sample of one.
 
+**Whisper's line boundaries are not the song's.** On the YouTube path the lines
+come from where the transcriber breathed, not from where the song does, so a
+row can start mid-phrase: "We're no strangers to love You" and then "know the
+rules and so you have". The rewrite maps onto whatever the timings use, which is
+the correct behaviour and does not hurt the new words — each rewritten line is
+self-contained — but it means the original column of the handover reads
+strangely, and on a dense mix with no pauses to split at, the split lands
+wherever. A musical phrase detector, or beat tracking, would fix it. Syllable
+counts and stress would not change.
+
 **Nothing has been in a room with ten people in it.** Everything above is
 measured. The thing the brief actually asks for is not.
