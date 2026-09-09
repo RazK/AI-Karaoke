@@ -60,12 +60,15 @@ def build(title: str, out: Path, licence_note: str) -> Path:
         "title": song.title, "artist": song.artist, "licence": licence_note,
         "duration": song.duration,
         "lines": [{"i": l.id, "s": round(l.start, 3), "e": round(l.end, 3),
-                   "u": l.uncertain,
+                   "u": l.uncertain, "k": len(l.slots),
                    "o": originals[l.id] if l.id < len(originals) else "",
                    "ow": ow[l.id] if l.id < len(ow) else []}
                   for l in h.lines],
+        # Word times recomputed, not read back: a rewrite saved before the
+        # timing carried which slots a word sits on would put every word in the
+        # first column of the grid.
         "takes": [{"name": d["name"], "licence": d["licence"], "corpus": d["corpus"],
-                   "lines": d["lines"], "words": d["words"],
+                   "lines": d["lines"], "words": word_times(h, d["lines"]),
                    "score": d["card"]["singable"], "bends": len(d["bends"]),
                    "fromCorpus": d["card"]["corpus_fidelity"]}
                   for d in takes],

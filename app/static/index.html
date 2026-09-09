@@ -81,7 +81,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--hot)}
 .top .name b{display:block;font-size:15px;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap}
 .top .name small{color:var(--dim);font-size:12px}
-#rail{flex:1;position:relative;overflow:hidden;mask-image:linear-gradient(
+#rail{flex:1;position:relative;overflow:clip;mask-image:linear-gradient(
   to bottom,transparent,#000 16%,#000 84%,transparent)}
 #inner{position:absolute;left:0;right:0;top:50%;will-change:transform}
 .ln{padding:9px 20px;text-align:center;transition:opacity .3s}
@@ -108,7 +108,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--hot)}
    turns the rest of the screen into scattered words you cannot read ahead in. */
 #play.aligned .ln.on,#play.aligned .ln.next{display:grid;
   grid-template-columns:var(--cols);align-items:baseline;justify-items:start;
-  column-gap:7px;row-gap:5px}
+  column-gap:8px;row-gap:5px;width:max-content;max-width:100%;margin-inline:auto}
 #play.aligned .ln.on .orig,#play.aligned .ln.on .txt,
 #play.aligned .ln.next .orig,#play.aligned .ln.next .txt{display:contents}
 #play.aligned .ln.on .ow,#play.aligned .ln.next .ow{grid-row:1;white-space:nowrap}

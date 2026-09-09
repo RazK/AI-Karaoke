@@ -210,18 +210,11 @@ document.addEventListener('keydown', e => {
 // syllables are long -- which is where the rhythm becomes visible, and where a
 // held note becomes a wide column rather than a guess.
 function slotWidths(owords, slots) {
-  // How long each syllable lasts, taken from the original's own words. A word
-  // covering three syllables shares its time between them.
-  const each = new Array(slots).fill(0.25);
-  owords.forEach(w => {
-    for (let k = 0; k < (w.n || 1); k++) {
-      const at = (w.i || 0) + k;
-      if (at < slots) each[at] = Math.max(0.12, w.d / (w.n || 1));
-    }
-  });
-  // min-content, not 0: a column has to be at least as wide as the word in it
-  // or a long word runs into the next one and reads as "Shouldbe".
-  return each.map(d => `minmax(min-content,${d.toFixed(3)}fr)`).join(' ');
+  // One column per syllable, each only as wide as the widest word that lands on
+  // it. The longer of the two lines therefore sets the width of the pair and
+  // the shorter one spreads to match it. Sizing the columns by duration instead
+  // stretched every line across the whole screen, which nobody can read.
+  return `repeat(${slots},auto)`;
 }
 
 function grid(words, cls) {
@@ -240,18 +233,22 @@ function applyLayout() {
   if (aligned) fitLines();
 }
 
-// A twelve-syllable line will not fit twelve columns of text across a phone, so
-// each line is scaled to the width it has. Both rows scale together, which is
-// what keeps them aligned.
+// A long line can still be wider than the screen, so it is scaled to fit. Both
+// rows are in one grid, so scaling the line scales them together and they stay
+// aligned. Only the two lines that are laid out this way need measuring, and
+// only when they change.
+function fitLine(r) {
+  if (!r) return;
+  r.el.style.setProperty('--fit', '1');
+  const room = $('rail').clientWidth - 28;
+  if (room <= 0) return;
+  const wide = r.el.scrollWidth;
+  if (wide > room) r.el.style.setProperty('--fit', Math.max(0.4, room / wide).toFixed(3));
+}
+
 function fitLines() {
-  const room = $('rail').clientWidth - 24;
-  if (room <= 0) return;  // the rail is not on screen yet; nothing to measure against
-  rows.forEach(r => {
-    r.el.style.setProperty('--fit', '1');
-    const wide = Math.max(r.el.querySelector('.orig').scrollWidth,
-                          r.el.querySelector('.txt').scrollWidth);
-    if (wide > room) r.el.style.setProperty('--fit', Math.max(0.45, room / wide).toFixed(3));
-  });
+  fitLine(rows[Math.max(active, 0)]);
+  fitLine(rows[Math.max(active, 0) + 1]);
 }
 
 $('spacing').onclick = () => {
@@ -293,6 +290,7 @@ function tick() {
         + (k === i + 1 ? ' next' : '')
         + (Math.abs(k - i) > 3 ? ' far' : '');
     });
+    if (aligned) { fitLine(rows[Math.max(i, 0)]); fitLine(rows[Math.max(i, 0) + 1]); }
     const target = rows[Math.max(i, 0)];
     if (target) {
       $('inner').style.transition = 'transform .42s cubic-bezier(.2,.7,.3,1)';

@@ -38,15 +38,20 @@ header{flex:none;padding:14px 18px 10px;border-bottom:1px solid var(--edge);
 .take[aria-pressed="true"] .meta{color:var(--lit)}
 
 /* ── stage ────────────────────────────────────────────────────────────── */
-#stage{flex:1;position:relative;overflow:hidden;
+#stage{flex:1;position:relative;overflow:clip;
   mask-image:linear-gradient(to bottom,transparent,#000 15%,#000 85%,transparent)}
 #reel{position:absolute;left:0;right:0;top:50%;will-change:transform;
   transition:transform .42s cubic-bezier(.2,.7,.3,1)}
 .line{padding:10px 20px;text-align:center}
-.was{font-family:var(--sans);font-size:clamp(13px,2.5vw,20px);font-weight:500;
-  color:#2c5a54;line-height:1.3;margin-bottom:6px;min-height:16px}
-.now{font-family:var(--disp);font-size:clamp(21px,5.6vw,38px);font-weight:800;
-  line-height:1.18;letter-spacing:-.015em;overflow-wrap:break-word}
+/* The two rows are a pair, so they are sized as one: the sung line leads and
+   the original sits just under it, close enough to read as its partner rather
+   than as a caption. --fit shrinks a long line to the width it has. */
+.line{--now:clamp(21px,5.6vw,38px);--was:clamp(16px,4.1vw,27px)}
+.line.past,.line.soon{--now:clamp(14px,2.5vw,21px);--was:clamp(11px,1.9vw,15px)}
+.was{font-family:var(--sans);font-size:calc(var(--was) * var(--fit,1));
+  font-weight:500;color:#2c5a54;line-height:1.3;margin-bottom:6px;min-height:16px}
+.now{font-family:var(--disp);font-size:calc(var(--now) * var(--fit,1));
+  font-weight:800;line-height:1.18;letter-spacing:-.015em;overflow-wrap:break-word}
 .w,.ow{transition:color .1s}
 .w{color:#39304a}
 .ow{color:#2c5a54}
@@ -54,16 +59,25 @@ header{flex:none;padding:14px 18px 10px;border-bottom:1px solid var(--edge);
 .line.on .ow.lit{color:var(--was)}
 .line.on .w.lit{color:var(--lit);text-shadow:0 0 26px rgba(255,207,122,.45)}
 .line.past .w{color:rgba(243,238,251,.22)}
-.line.past .now,.line.soon .now{font-size:clamp(14px,2.5vw,21px);font-weight:600}
+.line.past .now,.line.soon .now{font-weight:600}
 .line.past .was,.line.soon .was{display:none}
 .line.next .was{display:block;font-size:clamp(11px,1.8vw,14px);color:#24504b}
 .line.soon .w{color:#4c4162}
 .line.far{opacity:.4}
 .line.unsure .now::after{content:"?";color:#c98b4b;font-size:.5em;
   vertical-align:super;margin-left:5px}
-/* spacing by the timings: each word carries its own gap, used only in this mode */
-.w,.ow{margin-right:0}
-body.timed .w,body.timed .ow{margin-right:var(--gap,0)}
+/* Word over word, and only on the line being sung and the one after it, where
+   both rows are on screen. One grid for the whole line, not one per row:
+   display:contents dissolves the wrappers so every word from both rows is an
+   item of the same grid, which is what makes the columns resolve identically
+   instead of drifting a few pixels a word. */
+body.aligned .line.on,body.aligned .line.next{display:grid;
+  grid-template-columns:var(--cols);align-items:baseline;justify-items:start;
+  column-gap:8px;row-gap:5px;width:max-content;max-width:100%;margin-inline:auto}
+body.aligned .line.on .was,body.aligned .line.on .now,
+body.aligned .line.next .was,body.aligned .line.next .now{display:contents}
+body.aligned .line.on .ow,body.aligned .line.next .ow{grid-row:1;white-space:nowrap}
+body.aligned .line.on .w,body.aligned .line.next .w{grid-row:2;white-space:nowrap}
 
 /* ── transport ────────────────────────────────────────────────────────── */
 footer{flex:none;border-top:1px solid var(--edge);background:#100d17;
@@ -109,7 +123,7 @@ footer{flex:none;border-top:1px solid var(--edge);background:#100d17;
     <span id="tend">0:00</span>
   </div>
   <div class="row">
-    <button class="chip" id="spacing">spacing <b>even</b></button>
+    <button class="chip" id="spacing">lines <b>flowing</b></button>
     <button class="pp" id="pp" aria-label="Play">&#9654;</button>
     <div class="nudge">
       <button id="back" aria-label="Lyrics earlier">&#9664;</button>
@@ -130,19 +144,43 @@ const audio = new Audio(D.audio);
 audio.preload = 'auto';
 
 let take = 0, offset = 0, rows = [], active = -1;
-let timed = false;
-try { timed = localStorage.getItem('spacing') === 'timed'; } catch (e) {}
+let aligned = false;
+try { aligned = localStorage.getItem('lines') === 'aligned'; } catch (e) {}
 
-// Words can sit evenly, the way lyrics are normally set, or be spaced by the
-// gaps in the timing so the rhythm shows on the page: a rest opens up, a run of
-// quick words closes in, and the wide space before a held note is the held note.
-const PX_PER_SECOND = 62, MAX_GAP = 130;
-function spaced(words, cls) {
-  return words.map((w, k) => {
-    const nxt = words[k + 1];
-    const gap = nxt ? Math.max(0, nxt.t - (w.t + w.d)) : 0;
-    return `<span class="${cls}" style="--gap:${Math.min(Math.round(gap * PX_PER_SECOND), MAX_GAP)}px">${esc(w.w)}</span>`;
-  }).join(' ');
+// Two ways to set the words. Flowing is how lyrics are normally printed:
+// centred, evenly spaced, easy to read and silent about rhythm. Word over word
+// puts both lines on one grid with a column per syllable -- they sit on the
+// same syllables, so each new word starts exactly where the word it replaces
+// starts, and a held syllable is a wide column rather than a guess.
+function slotWidths(owords, slots) {
+  // One column per syllable, each only as wide as the widest word that lands on
+  // it. The longer of the two lines therefore sets the width of the pair and the
+  // shorter one spreads to match it. Sizing the columns by duration instead
+  // stretched every line across the whole screen, which nobody can read.
+  return `repeat(${slots},auto)`;
+}
+
+function grid(words, cls) {
+  return words.map(w =>
+    `<span class="${cls}" style="grid-column:${(w.i || 0) + 1}/span ${w.n || 1}">`
+    + `${esc(w.w)}</span>`).join(' ');
+}
+
+// A long line can still be wider than the screen, so it is scaled to fit. Both
+// rows are in one grid, so scaling the line scales them together and they stay
+// aligned.
+function fitLine(r) {
+  if (!r) return;
+  r.el.style.setProperty('--fit', '1');
+  const room = $('stage').clientWidth - 28;
+  if (room <= 0) return;
+  const wide = r.el.scrollWidth;
+  if (wide > room) r.el.style.setProperty('--fit', Math.max(0.4, room / wide).toFixed(3));
+}
+
+function fitLines() {
+  fitLine(rows[Math.max(active, 0)]);
+  fitLine(rows[Math.max(active, 0) + 1]);
 }
 
 $('title').textContent = D.title;
@@ -183,8 +221,9 @@ function build() {
   rows = D.lines.map((l, i) => {
     const el = document.createElement('div');
     el.className = 'line' + (l.u ? ' unsure' : '');
-    el.innerHTML = `<div class="was">${l.ow.length ? spaced(l.ow, 'ow') : esc(l.o)}</div>`
-      + `<div class="now">${spaced(t.words[i], 'w')}</div>`;
+    el.style.setProperty('--cols', slotWidths(l.ow, l.k || l.ow.length || 1));
+    el.innerHTML = `<div class="was">${l.ow.length ? grid(l.ow, 'ow') : esc(l.o)}</div>`
+      + `<div class="now">${grid(t.words[i], 'w')}</div>`;
     el.onclick = () => { audio.currentTime = Math.max(0, l.s - 0.3); };
     $('reel').append(el);
     return { el, line: l, words: t.words[i], owords: l.ow,
@@ -193,6 +232,7 @@ function build() {
   });
   active = -1;
   paint(true);
+  if (aligned) fitLines();
 }
 
 function paint(force) {
@@ -207,6 +247,7 @@ function paint(force) {
         + (k === i + 1 ? ' next' : '')
         + (Math.abs(k - i) > 3 ? ' far' : '');
     });
+    if (aligned) { fitLine(rows[Math.max(i, 0)]); fitLine(rows[Math.max(i, 0) + 1]); }
     const target = rows[Math.max(i, 0)];
     if (target) $('reel').style.transform =
       `translateY(${-(target.el.offsetTop + target.el.offsetHeight / 2)}px)`;
@@ -251,15 +292,17 @@ function nudge(ms) {
 $('back').onclick = () => nudge(-100);
 $('fwd').onclick = () => nudge(100);
 
-function applySpacing() {
-  document.body.classList.toggle('timed', timed);
-  $('spacing').innerHTML = `spacing <b>${timed ? 'by timing' : 'even'}</b>`;
+function applyLayout() {
+  document.body.classList.toggle('aligned', aligned);
+  $('spacing').innerHTML = `lines <b>${aligned ? 'word over word' : 'flowing'}</b>`;
+  if (aligned) fitLines();
 }
 $('spacing').onclick = () => {
-  timed = !timed;
-  try { localStorage.setItem('spacing', timed ? 'timed' : 'even'); } catch (e) {}
-  applySpacing();
+  aligned = !aligned;
+  try { localStorage.setItem('lines', aligned ? 'aligned' : 'flowing'); } catch (e) {}
+  applyLayout();
 };
+addEventListener('resize', () => { if (aligned) fitLines(); });
 
 document.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); $('pp').click(); }
@@ -267,7 +310,7 @@ document.addEventListener('keydown', e => {
   if (e.code === 'ArrowRight') nudge(100);
 });
 
-applySpacing();
+applyLayout();
 build();
 frame();
 </script>
