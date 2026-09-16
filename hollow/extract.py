@@ -10,7 +10,8 @@ from dataclasses import dataclass
 
 from . import prosody
 from .audio import Voicing, semitones
-from .format import HOLD_S, Hollow, Line, Slot, pairs_from_classes
+from .format import (HOLD_S, Hollow, Line, Slot, echo_labels,
+                     pairs_from_classes, sections_from)
 
 # A line whose span is voiced less than this is a line the aligner has put
 # somewhere the singer is not.
@@ -127,6 +128,7 @@ def build(
     texts = [" ".join(w.text for w in by_line[i]) for i in order]
 
     lines: list[Line] = []
+    kept: list[str] = []  # the text of each line that produced slots
     labels = prosody.rhyme_classes(texts)
     for k, i in enumerate(order):
         lw = sorted(by_line[i], key=lambda w: w.start)
@@ -137,6 +139,10 @@ def build(
             continue
         lines.append(Line(len(lines), 0, slots, labels[k], _confidence(lw, voicing),
                           ref_hz))
+        kept.append(texts[k])
+    # A line that produced no slots is dropped, so the texts have to be dropped
+    # with it or every original after it is off by one.
+    texts = kept
 
     # Phrase groups: a gap in the singing starts a new one.
     groups: list[list[int]] = []
@@ -149,6 +155,15 @@ def build(
         for lid in ids:
             lines[lid].group = gi
 
+    # Which lines are the same line sung again, and how the song divides into
+    # verses and choruses. Both are worked out here, from the words, on this
+    # machine -- and only the shapes are kept, never the words.
+    shapes = [(len(l.slots), tuple(s.stress for s in l.slots)) for l in lines]
+    echoes = echo_labels(texts, shapes)
+    for l, e in zip(lines, echoes):
+        l.echo = e
+    sections, section_echo = sections_from(echoes, groups, len(lines))
+
     h = Hollow(
         song_ref=song_ref,
         duration=round(duration, 3),
@@ -156,6 +171,8 @@ def build(
         groups=groups,
         rhyme_pairs=pairs_from_classes([l.rhyme for l in lines]),
         source_kind=source_kind,
+        sections=sections,
+        section_echo=section_echo,
         offset_ms=offset_ms,
         offset_confident=offset_confident,
         notes=notes or {},

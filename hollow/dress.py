@@ -55,7 +55,11 @@ class Dressing:
     corpus: str
     lines: list[str]
     bends: list[Bend] = field(default_factory=list)
-    from_corpus: list[bool] = field(default_factory=list)  # per line: found, not written
+    # per line: this line's words are the corpus's own, not written for it
+    from_corpus: list[bool] = field(default_factory=list)
+    section: list[int] = field(default_factory=list)  # which section each line is in
+    # per line: the earlier line it copies, when it is a repeat of one
+    echo_of: list[int | None] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -64,10 +68,46 @@ class Dressing:
             "lines": self.lines,
             "bends": [b.__dict__ for b in self.bends],
             "from_corpus": self.from_corpus,
+            "section": self.section,
+            "echo_of": self.echo_of,
         }
 
 
 # ── the corpus, as a searchable run of words ───────────────────────────────
+
+def _is_furniture(block: str) -> bool:
+    """Is this block a label rather than something anyone would sing?
+
+    "REVIEW 3 - Rating: 1 star", "Reviewer: NeverComingBack Mark", "PARTS LIST".
+    Left in, they get sung: one chorus came out as "Rating one star Reviewer"
+    three times over, which is the corpus's filing system, not its voice.
+    """
+    words = re.findall(r"[A-Za-z][A-Za-z'’\-]*", block)
+    if len(words) >= 8:
+        return False
+    stripped = block.strip()
+    return ":" in stripped or stripped.isupper()
+
+
+_ONES = ("zero one two three four five six seven eight nine ten eleven twelve "
+         "thirteen fourteen fifteen sixteen seventeen eighteen nineteen").split()
+_TENS = ("_ _ twenty thirty forty fifty sixty seventy eighty ninety").split()
+
+
+def _say(number: str) -> list[str]:
+    """Numbers as words, because a number is sung, not printed.
+
+    The source texts are full of them -- "Step 1 of 18", "Screw, 5x50mm",
+    "Panel A x2" -- and dropping them turned every instruction into "Step of".
+    """
+    n = int(number)
+    if n < 20:
+        return [_ONES[n]]
+    if n < 100:
+        tens, ones = divmod(n, 10)
+        return [_TENS[tens]] + ([_ONES[ones]] if ones else [])
+    return [w for digit in number for w in _say(digit)]
+
 
 @dataclass
 class Corpus:
@@ -76,19 +116,34 @@ class Corpus:
     syllables: list[int]  # syllable count per word
     starts: set[int]  # word indices that begin a sentence
     ends: set[int]  # word indices that end one
+    # Word ranges of the source's own paragraphs. These carry the text's order:
+    # "Step 1 of 18" then "Step 2 of 18", one review's complaint then the next.
+    # Drawing a whole section of the song from one stretch of them is what makes
+    # consecutive lines about the same thing.
+    paras: list[tuple[int, int]] = field(default_factory=list)
 
     @staticmethod
     def build(text: str) -> "Corpus":
         words, starts, ends, at_start = [], set(), set(), True
-        for token in re.findall(r"[A-Za-z][A-Za-z'’\-]*|[.!?;:,]", text):
-            if token[0].isalpha():
-                if at_start:
-                    starts.add(len(words))
-                    at_start = False
-                words.append(token)
-            elif words:
-                ends.add(len(words) - 1)
-                at_start = token in ".!?;:"
+        paras: list[tuple[int, int]] = []
+        for block in text.split("\n\n"):
+            if _is_furniture(block):
+                continue
+            first = len(words)
+            for token in re.findall(r"[A-Za-z][A-Za-z'’\-]*|\d+|[.!?;:,]", block):
+                if token[0].isalpha() or token[0].isdigit():
+                    spoken = _say(token) if token[0].isdigit() else [token]
+                    if at_start:
+                        starts.add(len(words))
+                        at_start = False
+                    words.extend(spoken)
+                elif words:
+                    ends.add(len(words) - 1)
+                    at_start = token in ".!?;:"
+            if len(words) > first:
+                paras.append((first, len(words)))
+                ends.add(len(words) - 1)  # a paragraph ends a sentence
+                at_start = True
         syls = [list(prosody.pronunciations(w)[0]) for w in words]
         return Corpus(
             words=words,
@@ -96,6 +151,7 @@ class Corpus:
             syllables=[len(s) for s in syls],
             starts=starts,
             ends=ends,
+            paras=paras,
         )
 
     def phrase(self, i: int, j: int) -> str:
@@ -127,22 +183,25 @@ def _trim(c: Corpus, i: int, j: int, want: int) -> tuple[int, int]:
     return i, j
 
 
-def find(c: Corpus, line: Line, near: float, used: set[int]) -> list[Candidate]:
+def find(c: Corpus, line: Line, used: set[int],
+         window: tuple[int, int] | None = None) -> list[Candidate]:
     """Every phrase in the corpus that could stand in for this line.
 
-    `near` is where in the corpus we would like to be, from 0 to 1, so that the
-    rewrite walks through the source text roughly in its own order instead of
-    ransacking one good paragraph.
+    `window` is the stretch of the source this part of the song is drawn from.
+    Searching the whole text for every line independently is what produced a
+    song whose seventh line was about a cam lock and whose eighth was about a
+    hair in the soup: each line fitted and the song meant nothing.
     """
     want = len(line.slots)
     asks = [s.stress for s in line.slots]
     held = [s.held for s in line.slots]
-    home = near * max(len(c.words) - 1, 1)
+    lo, hi = window or (0, len(c.words))
+    home = (lo + hi) / 2
     out: list[Candidate] = []
 
-    for i in range(len(c.words)):
+    for i in range(lo, hi):
         total, j = 0, i
-        while j < len(c.words) and total < want + 3:
+        while j < hi and total < want + 3:
             total += c.syllables[j]
             j += 1
             if total < want - 3:
@@ -166,14 +225,20 @@ def find(c: Corpus, line: Line, near: float, used: set[int]) -> list[Candidate]:
                 + (0.7 if b - 1 in c.ends else 0)
                 # a phrase that opens or closes on a dangling "of" reads as a
                 # fragment cut out of something, which it is
-                - (0.9 if c.words[a].lower() in TRIMMABLE and a not in c.starts else 0)
-                - (0.9 if c.words[b - 1].lower() in TRIMMABLE else 0)
+                # A leading "The" is ordinary English; a leading "Of" is the
+                # middle of a sentence with its front cut off.
+                - (3.0 if c.words[a].lower() in prosody.BAD_OPENER
+                   and a not in c.starts else 0)
+                # "took so long that both of my" fits the tune and is not a
+                # sentence. grade.py marks these; the engine should not make
+                # them in the first place, and both read the same word list.
+                - (3.0 if c.words[b - 1].lower() in prosody.DANGLING else 0)
                 # running through the end of one sentence and into the next is
                 # how you get "would not close The chef at": it fits the melody
                 # and is not English
                 - 2.5 * len(c.ends & set(range(a, b - 1)))
                 - 1.2 * len(used & set(range(a, b))) / max(b - a, 1)
-                - 1.5 * abs((a + b) / 2 - home) / max(len(c.words), 1)
+                - 1.5 * abs((a + b) / 2 - home) / max(hi - lo, 1)
             )
             out.append(Candidate(a, b, c.phrase(a, b), n, stress_fit, score))
     out.sort(key=lambda x: -x.score)
@@ -338,10 +403,117 @@ def manual_writer(dir_path):
 
 # ── the run ────────────────────────────────────────────────────────────────
 
-def _rows(h: Hollow, group: int, filled: dict[int, str]) -> str:
-    """The group's rows, with the lines already found shown in place."""
+# ── one section at a time ──────────────────────────────────────────────────
+#
+# The old engine walked the song line by line and searched the whole corpus for
+# each line on its own. Every line fitted and the song meant nothing, because
+# line seven came from a paragraph about a cam lock and line eight from a
+# paragraph about a hair in the soup. A song is written a part at a time, out of
+# one stretch of source, with the lines already written in view.
+
+# At or below this the corpus's own words are the whole output and no model is
+# called. Above it, lines the corpus cannot fill go to the writer.
+QUOTE_END = 0.20
+BEAM_WIDTH = 8
+CANDIDATES_PER_LINE = 12
+
+
+def stress_bar(licence: float) -> float:
+    """How well a lifted phrase's stresses must match before it is accepted.
+
+    It rises with licence: the more freedom the writer has, the less reason to
+    take someone else's sentence that only half fits. At 0.75 it reaches 1 and
+    nothing is lifted unless it fits perfectly.
+
+    `grade.honesty` needs the same rule to decide what counts as a bend, so it
+    lives here and is imported there rather than written out twice.
+    """
+    return min(1.0, 0.55 + 0.6 * licence)
+
+
+def _windows(c: Corpus, sizes: list[int]) -> list[tuple[int, int]]:
+    """Give each section its own stretch of the source, in the source's order.
+
+    A section's lines then come from neighbouring sentences, which is the whole
+    mechanism behind consecutive lines being about the same thing.
+    """
+    paras = c.paras or [(0, len(c.words))]
+    total = sum(sizes) or 1
+    out, at = [], 0
+    for k, size in enumerate(sizes):
+        take = max(1, round(len(paras) * size / total))
+        if k == len(sizes) - 1:
+            take = max(1, len(paras) - at)
+        chunk = paras[at : at + take] or [paras[min(at, len(paras) - 1)]]
+        out.append((chunk[0][0], chunk[-1][1]))
+        at = min(at + take, len(paras) - 1)
+    return out
+
+
+def _beam(c: Corpus, h: Hollow, ids: list[int], window: tuple[int, int],
+          used: set[int]) -> list[Candidate | None]:
+    """Choose phrases for a whole section at once, in the source's order.
+
+    Greedy per-line choice is what produced the non-sequiturs: each line took
+    the best phrase anywhere and the section wandered. Here a section is one
+    search, and a phrase that carries on from the previous line's phrase is
+    worth more than a better-fitting phrase from somewhere else.
+    """
+    lo, hi = window
+    span = max(hi - lo, 1)
+    partner = {b: a for a, b in h.rhyme_pairs}
+    # (total score, last span end, picks)
+    beams: list[tuple[float, int, list[Candidate | None]]] = [(0.0, lo, [])]
+
+    for pos, lid in enumerate(ids):
+        line = h.lines[lid]
+        cands = find(c, line, used, window)[:CANDIDATES_PER_LINE]
+        if not cands:
+            beams = [(sc, end, picks + [None]) for sc, end, picks in beams]
+            continue
+        nxt: list[tuple[float, int, list[Candidate | None]]] = []
+        for sc, end, picks in beams:
+            mate = partner.get(lid)
+            rhyme_with = None
+            if mate in ids:
+                got = picks[ids.index(mate)] if ids.index(mate) < len(picks) else None
+                rhyme_with = got.text if got else None
+            # Say a thing once per section. A chorus that sings "my wife's
+            # pasta had so much" three times over is the search finding one good
+            # phrase and stopping.
+            #
+            # This is a rule, and rules come before preferences: rhyme used to
+            # be applied first, and on three lines that rhyme with each other it
+            # narrowed the choice to the single phrase already used, so the
+            # fallback handed that same phrase back three times.
+            taken = {x.text.lower() for x in picks if x}
+            pool = [x for x in cands if x.text.lower() not in taken] or cands
+            if rhyme_with:
+                want = [x for x in pool if prosody.rhymes(x.text, rhyme_with)]
+                pool = want or pool
+            spans = {k for x in picks if x for k in range(x.i, x.j)}
+            for cand in pool:
+                gap = cand.i - end
+                step = cand.score
+                step += 2.0 if gap >= 0 else 0.0           # source order
+                step += 1.5 if 0 <= gap <= 4 else 0.0      # carries straight on
+                step -= 3.0 * abs(gap) / span              # jumping about
+                # A chorus that sings "my wife's pasta had so much" three times
+                # over is not a chorus, it is the search finding one good phrase
+                # and stopping. Inside a section, say a thing once.
+                step -= 4.0 * len(spans & set(range(cand.i, cand.j))) / max(cand.j - cand.i, 1)
+                nxt.append((sc + step, cand.j, picks + [cand]))
+        nxt.sort(key=lambda b: -b[0])
+        beams = nxt[:BEAM_WIDTH] or [(sc, end, picks + [None]) for sc, end, picks in beams]
+
+    best = max(beams, key=lambda b: b[0])[2]
+    return best + [None] * (len(ids) - len(best))
+
+
+def _rows(h: Hollow, ids: list[int], filled: dict[int, str]) -> str:
+    """One section's rows, with whatever is already written shown in place."""
     out = []
-    for lid in h.groups[group]:
+    for lid in ids:
         l = h.lines[lid]
         row = " ".join(("●" if s.stress else "○") + ("_" if s.held else "")
                        for s in l.slots)
@@ -368,100 +540,107 @@ def dress(
     c = Corpus.build(corpus_text)
     if not c.words:
         raise ValueError("that text has no words in it")
+    bar = stress_bar(licence)
 
-    # The bar a phrase lifted straight from the corpus has to clear. It rises
-    # with licence: the more freedom the writer has, the pickier we are about
-    # taking someone else's sentence instead.
-    bar = 0.55 + 0.45 * licence
+    sections = h.sections or list(h.groups)
+    echo = list(h.section_echo) + [None] * (len(sections) - len(h.section_echo))
+    distinct = [i for i, e in enumerate(echo) if e is None]
+    windows = _windows(c, [len(sections[i]) for i in distinct])
 
-    partner = {b: a for a, b in h.rhyme_pairs}
-    found: dict[int, Candidate] = {}
+    lines: dict[int, str] = {}
+    lifted: set[int] = set()  # this line is the corpus's own words
     used: set[int] = set()
-
-    for k, line in enumerate(h.lines):
-        cands = find(c, line, k / max(len(h.lines) - 1, 1), used)
-        if not cands:
-            continue
-        mate = partner.get(line.id)
-        if mate in found:  # keep the rhyme if any candidate offers it
-            want_rhyme = [x for x in cands if prosody.rhymes(x.text, found[mate].text)]
-            cands = want_rhyme or cands
-        best = cands[0]
-        if best.n == len(line.slots) and best.stress_fit >= bar:
-            found[line.id] = best
-            used.update(range(best.i, best.j))
-
-    lines: dict[int, str] = {lid: x.text for lid, x in found.items()}
-    log(f"licence {licence:.2f}: {len(lines)}/{len(h.lines)} lines found in the corpus")
-
-    # Everything still empty goes to the writer, a phrase group at a time so it
-    # can see what its lines have to sit next to. At licence 0 there is no
-    # writer: the corpus's own phrases are the whole of the output, and a line
-    # they cannot fill is a bend worth knowing about.
-    missing = [l.id for l in h.lines if l.id not in lines]
     unanswered: list[str] = []
-    if missing and writer is not None and licence > 0:
-        for gi, ids in enumerate(h.groups):
-            gap = [i for i in ids if i not in lines]
-            if not gap:
-                continue
+
+    for k, si in enumerate(distinct):
+        ids = sections[si]
+        picks = _beam(c, h, ids, windows[k], used)
+        gap: list[int] = []
+        for lid, cand in zip(ids, picks):
+            want = len(h.lines[lid].slots)
+            if cand and cand.n == want and cand.stress_fit >= bar:
+                lines[lid] = cand.text
+                lifted.add(lid)
+                used.update(range(cand.i, cand.j))
+            else:
+                gap.append(lid)
+
+        if gap and writer is not None and licence > QUOTE_END:
+            before = lines.get(sections[distinct[k - 1]][-1]) if k else None
             prompt = PROMPT.format(
-                legend=_rows(h, gi, lines), corpus=corpus_text.strip()[:6000],
+                legend=_rows(h, ids, {i: lines[i] for i in ids if i in lines}),
+                corpus=c.phrase(*windows[k]),
                 licence=licence, licence_note=_note(licence), n=len(gap),
             )
+            if before:
+                prompt += f"\nThe line before this section ends: {before!r}\n"
             try:
                 reply = writer(prompt)
             except NeedsAnswer as need:
-                # Keep going so that one run puts every question on the table
-                # rather than one per attempt.
                 unanswered.append(str(need))
-                continue
+                reply = ""
             for m in _ANSWER.finditer(reply):
                 lid = int(m.group(1))
                 if lid in gap:
                     lines[lid] = m.group(2).strip(' "')
+
+        # Anything the writer did not fill takes the best phrase going.
+        for lid, cand in zip(ids, picks):
+            if lid not in lines and cand:
+                lines[lid] = cand.text
+                used.update(range(cand.i, cand.j))
+
+    # A repeat is never searched for: it carries the words its first outing got.
+    # This is the whole chorus rule, and it also puts repeats beyond the reach
+    # of the reuse penalty and the positional bias, which used to drive the same
+    # sung line to three different sets of words.
+    for si, source in enumerate(echo):
+        if source is None or len(sections[si]) != len(sections[source]):
+            continue
+        for here, there in zip(sections[si], sections[source]):
+            if there in lines:
+                lines[here] = lines[there]
+                if there in lifted:
+                    lifted.add(here)
+
     if unanswered:
         raise NeedsAnswer("\n".join(unanswered))
 
-    # Anything the writer did not answer, and everything at licence 0, falls
-    # back to the closest phrase the corpus has. The song always plays.
+    log(f"licence {licence:.2f}: {len(lifted)}/{len(h.lines)} lines are the "
+        f"corpus's own words")
+
     bends: list[Bend] = []
-    fell_back: set[int] = set()
-    for k, line in enumerate(h.lines):
+    for line in h.lines:
         want = len(line.slots)
         if line.id not in lines:
-            cands = find(c, line, k / max(len(h.lines) - 1, 1), used)
-            if not cands:
-                lines[line.id] = "…"
-                bends.append(Bend(line.id, want, 0, "the corpus has nothing this size"))
-                continue
-            lines[line.id] = cands[0].text
-            fell_back.add(line.id)
-            used.update(range(cands[0].i, cands[0].j))
-
+            lines[line.id] = "…"
+            bends.append(Bend(line.id, want, 0, "the corpus has nothing this size"))
+            continue
         lines[line.id] = _repair(lines[line.id], want)
         got = len(prosody.syllables_for(lines[line.id], want))
         if got != want:
-            bends.append(Bend(
-                line.id, want, got,
-                "no phrase in the corpus is this length"
-                if line.id in fell_back else "the writer could not land it",
-            ))
-        elif line.id in fell_back:
-            # The syllables landed, but only because we took the nearest phrase
-            # the corpus had rather than one that actually fits the line: its
-            # stresses fall in the wrong places. That is a deviation and it gets
-            # declared, because a line of the right length with the stress in
-            # the wrong place is audibly wrong, and this list is where the
-            # corpus and the song genuinely would not meet.
+            bends.append(Bend(line.id, want, got,
+                              "nothing of this length could be found or written"))
+        elif line.id not in lifted and writer is None and licence <= QUOTE_END:
             bends.append(Bend(line.id, want, got,
                               "nothing in the corpus fits this line's stresses"))
 
-    ordered = [lines[l.id] for l in h.lines]
+    section_of = [0] * len(h.lines)
+    for si, ids in enumerate(sections):
+        for lid in ids:
+            if lid < len(section_of):
+                section_of[lid] = si
+    copies = {}
+    for si, source in enumerate(echo):
+        if source is not None and len(sections[si]) == len(sections[source]):
+            copies.update(dict(zip(sections[si], sections[source])))
+
     return Dressing(
         licence=licence,
         corpus=corpus_name,
-        lines=ordered,
+        lines=[lines[l.id] for l in h.lines],
         bends=bends,
-        from_corpus=[l.id in found for l in h.lines],
+        from_corpus=[l.id in lifted for l in h.lines],
+        section=section_of,
+        echo_of=[copies.get(l.id) for l in h.lines],
     )

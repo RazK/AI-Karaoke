@@ -17,7 +17,10 @@ copyrighted lyric.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
+
+from .prosody import _label as prosody_label
 from pathlib import Path
 
 HOLLOW_VERSION = 1
@@ -55,6 +58,10 @@ class Line:
     # to it, which is what a writer wants to read; this is what a synthesiser
     # needs so that line 2 sits where it should against line 1.
     ref_hz: float | None = None
+    # Which repeat class this line belongs to, or None if it is sung once.
+    # Lines sharing a label are the SAME line of the song -- the chorus -- and
+    # must carry the same rewritten words wherever they appear.
+    echo: str | None = None
 
     @property
     def start(self) -> float:
@@ -77,6 +84,12 @@ class Hollow:
     groups: list[list[int]]  # phrase groups, as lists of line ids
     rhyme_pairs: list[tuple[int, int]]
     source_kind: str  # "youtube" | "karaoke_file"
+    # Sections are what a singer would call verse, chorus, bridge: an ordered
+    # partition of every line. `groups` are breath groups from silence gaps and
+    # can run twenty lines long, which is no use for writing a song a part at a
+    # time. `section_echo[i]` is the earlier section that section i repeats.
+    sections: list[list[int]] = field(default_factory=list)
+    section_echo: list[int | None] = field(default_factory=list)
     offset_ms: int = 0  # correction applied to imported timings, for the record
     offset_confident: bool = True
     version: int = HOLLOW_VERSION
@@ -115,6 +128,7 @@ class Hollow:
                 rhyme=l["rhyme"],
                 confidence=l.get("confidence", 1.0),
                 ref_hz=l.get("ref_hz"),
+                echo=l.get("echo"),
                 slots=[Slot(**s) for s in l["slots"]],
             )
             for l in d["lines"]
@@ -126,6 +140,10 @@ class Hollow:
             groups=[list(g) for g in d["groups"]],
             rhyme_pairs=[tuple(p) for p in d["rhyme_pairs"]],
             source_kind=d["source_kind"],
+            # A file written before sections existed falls back to its breath
+            # groups, so every song already in the library still loads.
+            sections=[list(g) for g in d.get("sections") or d["groups"]],
+            section_echo=list(d.get("section_echo") or []),
             offset_ms=d.get("offset_ms", 0),
             offset_confident=d.get("offset_confident", True),
             version=d.get("version", HOLLOW_VERSION),
@@ -222,3 +240,116 @@ def leaks(h: Hollow) -> list[str]:
 
     walk(h.to_dict(), "")
     return bad
+
+
+# ── sections and repeats ───────────────────────────────────────────────────
+
+MAX_SECTION_LINES = 10
+REFRAIN_MAX = 12
+SAME_LINE_OVERLAP = 0.8
+
+
+def _norm(text: str) -> tuple[str, ...]:
+    return tuple(re.findall(r"[a-z0-9']+", text.lower()))
+
+
+def echo_labels(texts: list[str], shapes: list[tuple]) -> list[str | None]:
+    """Label the lines that are the same line of the song sung again.
+
+    Two lines are the same line if their words match -- but a transcriber does
+    not render a repeated chorus identically every time, so near-matches count
+    too, and only when the song's own shape agrees. That shape, the slot count
+    and stress pattern, matched every true repeat across five songs and never
+    missed one, so demanding it costs nothing and throws out the near-matches
+    that merely sound alike.
+    """
+    norm = [_norm(t) for t in texts]
+    classes: list[list[int]] = []
+    for i, words in enumerate(norm):
+        if not words:
+            continue
+        for members in classes:
+            j = members[0]
+            if shapes[i] != shapes[j]:
+                continue
+            a, b = set(words), set(norm[j])
+            if norm[i] == norm[j] or len(a & b) / max(len(a | b), 1) >= SAME_LINE_OVERLAP:
+                members.append(i)
+                break
+        else:
+            classes.append([i])
+
+    labels: list[str | None] = [None] * len(texts)
+    n = 0
+    for members in sorted((m for m in classes if len(m) > 1), key=lambda m: m[0]):
+        label = prosody_label(n)
+        n += 1
+        for i in members:
+            labels[i] = label
+    return labels
+
+
+def find_refrain(labels: list[str | None]) -> tuple[int, list[int]] | None:
+    """The longest run of lines that comes back later, unchanged.
+
+    That run is the chorus. Returns its length and where each occurrence starts.
+    """
+    n = len(labels)
+    for length in range(min(REFRAIN_MAX, n), 0, -1):
+        seen: dict[tuple, list[int]] = {}
+        for i in range(n - length + 1):
+            key = tuple(labels[i : i + length])
+            if None in key:
+                continue
+            seen.setdefault(key, []).append(i)
+        for starts in seen.values():
+            spread = []
+            for s in starts:
+                if not spread or s >= spread[-1] + length:
+                    spread.append(s)
+            if len(spread) >= 2:
+                return length, spread
+    return None
+
+
+def sections_from(labels: list[str | None], groups: list[list[int]],
+                  n_lines: int) -> tuple[list[list[int]], list[int | None]]:
+    """Cut the song into verses and choruses.
+
+    The refrain's occurrences become sections that point at the first one, so
+    the engine writes those words once. Everything else is split at the
+    refrain's edges and at the breath groups, and capped short enough that a
+    writer can hold a whole section in view at once.
+    """
+    refrain = find_refrain(labels)
+    claimed: dict[int, int] = {}  # line id -> occurrence index
+    if refrain:
+        length, starts = refrain
+        for k, s in enumerate(starts):
+            for i in range(s, s + length):
+                claimed[i] = k
+
+    breaks = {g[0] for g in groups}
+    sections: list[list[int]] = []
+    echo: list[int | None] = []
+    first_refrain: int | None = None
+
+    i = 0
+    while i < n_lines:
+        if i in claimed:
+            length = refrain[0]
+            sections.append(list(range(i, i + length)))
+            echo.append(None if first_refrain is None else first_refrain)
+            if first_refrain is None:
+                first_refrain = len(sections) - 1
+            i += length
+            continue
+        run = []
+        while i < n_lines and i not in claimed:
+            if run and (i in breaks or len(run) >= MAX_SECTION_LINES):
+                break
+            run.append(i)
+            i += 1
+        sections.append(run)
+        echo.append(None)
+    return sections, echo

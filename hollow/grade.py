@@ -21,15 +21,7 @@ from .format import Hollow
 
 GATE = 7.0
 
-# Closed-class words. A line that ends on one is almost always a fragment.
-FUNCTION = frozenset(
-    "a an the and or but nor so yet for of to in on at by with from into onto "
-    "over under about as if than that this these those is are was were be been "
-    "being am do does did have has had will would can could shall should may "
-    "might must not no i you he she it we they me him her us them my your his "
-    "its our their there here when while because although though very just".split()
-)
-DANGLING = FUNCTION - {"no", "not", "there", "here", "it", "me", "you", "us", "them", "him", "her"}
+from .prosody import DANGLING, FUNCTION  # noqa: F401  (re-exported)
 
 
 @dataclass

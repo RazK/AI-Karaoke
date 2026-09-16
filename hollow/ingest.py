@@ -99,6 +99,14 @@ def to_lrc(words: list[TimedWord], meta: dict | None = None) -> str:
 
 # ── YouTube ────────────────────────────────────────────────────────────────
 
+# From a datacentre address YouTube answers the default web client with "Sign in
+# to confirm you're not a bot", and sometimes 429s the webpage outright. Asking
+# for the android_vr client as well gets metadata through where the default
+# alone does not. It does not always get the media through -- when the address
+# is rate-limited nothing here helps, and the caller sees the error.
+_CLIENTS = ["--extractor-args", "youtube:player_client=default,android_vr"]
+
+
 def fetch_youtube(url: str, out_dir: str | Path, log=print) -> tuple[Path, dict]:
     """Download the audio of a YouTube URL. Returns (mp3, metadata)."""
     out_dir = Path(out_dir)
@@ -107,7 +115,7 @@ def fetch_youtube(url: str, out_dir: str | Path, log=print) -> tuple[Path, dict]
 
     log("asking YouTube for the recording")
     info = json.loads(subprocess.run(
-        ["yt-dlp", "-J", "--no-playlist", url],
+        ["yt-dlp", "-J", "--no-playlist", *_CLIENTS, url],
         check=True, capture_output=True, text=True).stdout)
     vid = info["id"]
     mp3 = out_dir / f"{vid}.mp3"
@@ -117,7 +125,7 @@ def fetch_youtube(url: str, out_dir: str | Path, log=print) -> tuple[Path, dict]
         # later day, and different audio means different stems and a different
         # transcript.
         subprocess.run(
-            ["yt-dlp", "-f", "bestaudio[ext=webm]/bestaudio", "--no-playlist",
+            ["yt-dlp", "-f", "bestaudio[ext=webm]/bestaudio", "--no-playlist", *_CLIENTS,
              "-x", "--audio-format", "mp3", "--audio-quality", "0",
              "-o", str(out_dir / f"{vid}.%(ext)s"), url],
             check=True, capture_output=True, text=True)

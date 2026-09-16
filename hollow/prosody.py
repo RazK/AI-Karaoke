@@ -177,3 +177,23 @@ def rhyme_classes(lines: list[str]) -> list[str]:
 def rhymes(a: str, b: str) -> bool:
     ka, kb = rhyme_key(a), rhyme_key(b)
     return bool(ka) and ka == kb
+
+# Closed-class words. A line that ends on one is almost always a fragment, so
+# the engine avoids writing them and the grade card penalises them -- which only
+# agrees if both read the same list.
+FUNCTION = frozenset(
+    "a an the and or but nor so yet for of to in on at by with from into onto "
+    "over under about as if than that this these those is are was were be been "
+    "being am do does did have has had will would can could shall should may "
+    "might must not no i you he she it we they me him her us them my your his "
+    "its our their there here when while because although though very just".split()
+)
+DANGLING = FUNCTION - {"no", "not", "there", "here", "it", "me", "you", "us",
+                       "them", "him", "her"}
+# Words that should not open a line. A leading "The" or "My" is ordinary
+# English; a leading "Of" or "And that" is the middle of a sentence with its
+# front cut off -- "Of my children fell asleep at the table".
+BAD_OPENER = frozenset(
+    "of to in on at by with from into onto over under about as if than that "
+    "and or but nor so yet because although though while when".split()
+)
