@@ -15,7 +15,7 @@ import re
 from dataclasses import dataclass, field
 
 from . import prosody
-from .dress import Dressing
+from .dress import Dressing, stress_bar
 from .exam import Score, score
 from .format import Hollow
 
@@ -40,6 +40,9 @@ class Card:
     undeclared_bends: list[int] = field(default_factory=list)
     honesty: float = 1.0
     excluded: list[int] = field(default_factory=list)
+    # Lines that should repeat an earlier line and do not. This is not a score:
+    # a chorus that changes its words is broken, not merely worse.
+    chorus_broken: list[int] = field(default_factory=list)
 
     def __str__(self) -> str:
         if self.unsingable:
@@ -193,6 +196,18 @@ def grammar(lines: list[str], writer=None) -> tuple[float, list[int], str]:
 
 # ── was the bend list honest ───────────────────────────────────────────────
 
+def chorus_broken(d: Dressing) -> list[int]:
+    """Lines that are meant to repeat an earlier line but carry other words.
+
+    Should always be empty: the engine copies a repeat rather than writing it
+    again. It is checked rather than assumed, because a chorus that changes its
+    words every time is the single thing an audience notices first.
+    """
+    return [i for i, source in enumerate(d.echo_of)
+            if source is not None and i < len(d.lines)
+            and source < len(d.lines) and d.lines[i] != d.lines[source]]
+
+
 def honesty(h: Hollow, d: Dressing) -> tuple[float, int, list[int]]:
     """Check the declared bends against what actually happened.
 
@@ -201,7 +216,9 @@ def honesty(h: Hollow, d: Dressing) -> tuple[float, int, list[int]]:
     declared = {b.line for b in d.bends}
     # What actually happened, recomputed from scratch: a line of the wrong
     # length, or one whose stresses fall further out than the licence allows.
-    bar = 0.55 + 0.45 * d.licence
+    # The rule comes from the engine rather than being written out again here --
+    # two copies drifted apart and this one reported bends that never happened.
+    bar = stress_bar(d.licence)
     actual = set()
     for line, text in zip(h.lines, d.lines):
         if line.uncertain:
@@ -222,8 +239,10 @@ def honesty(h: Hollow, d: Dressing) -> tuple[float, int, list[int]]:
 def grade(h: Hollow, d: Dressing, corpus_text: str, original: list[str],
           writer=None) -> Card:
     s = score(h, d.lines)
+    broken = chorus_broken(d)
     if s.score < GATE:
-        return Card(singable=s.score, exam=s, unsingable=True, excluded=s.excluded)
+        return Card(singable=s.score, exam=s, unsingable=True,
+                    excluded=s.excluded, chorus_broken=broken)
 
     fid, note = corpus_fidelity(d.lines, corpus_text)
     dist, parts = register_distance(corpus_text, original)
@@ -235,5 +254,5 @@ def grade(h: Hollow, d: Dressing, corpus_text: str, original: list[str],
         register_distance=dist, register_parts=parts,
         grammar=gram, grammar_note=gnote, bad_lines=bad,
         declared_bends=declared, undeclared_bends=undeclared, honesty=hon,
-        excluded=s.excluded,
+        excluded=s.excluded, chorus_broken=broken,
     )
