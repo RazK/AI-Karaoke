@@ -245,6 +245,10 @@ def leaks(h: Hollow) -> list[str]:
 # ── sections and repeats ───────────────────────────────────────────────────
 
 MAX_SECTION_LINES = 10
+# Below this a section is a stub, not a part of a song.
+MIN_SECTION_LINES = 3
+# What a section may grow to by swallowing a stub beside it.
+MERGE_CAP = MAX_SECTION_LINES + MIN_SECTION_LINES
 REFRAIN_MAX = 12
 SAME_LINE_OVERLAP = 0.8
 
@@ -312,6 +316,47 @@ def find_refrain(labels: list[str | None]) -> tuple[int, list[int]] | None:
     return None
 
 
+def _merge_stubs(sections: list[list[int]], echo: list[int | None],
+                 refrain: set[int]) -> tuple[list[list[int]], list[int | None]]:
+    """Fold one- and two-line leftovers into the part beside them.
+
+    A transcript leaves stubs -- a single line stranded between two choruses,
+    or a two-line tail. A stub is the worst thing to hand a writer: one line,
+    no context, and nothing around it to read against. It is also a section
+    boundary the song does not actually have. Choruses are never touched: their
+    boundaries are real and their words are copied between them.
+    """
+    rec = [{"ids": list(ids), "echo": None, "refrain": k in refrain}
+           for k, ids in enumerate(sections)]
+    for k, source in enumerate(echo):
+        if source is not None:
+            rec[k]["echo"] = rec[source]
+
+    merged = True
+    while merged:
+        merged = False
+        for k, r in enumerate(rec):
+            if r["refrain"] or len(r["ids"]) >= MIN_SECTION_LINES:
+                continue
+            for j in (k - 1, k + 1):
+                if not 0 <= j < len(rec) or rec[j]["refrain"]:
+                    continue
+                # A stub is one or two lines; a part of eleven is still short
+                # enough to hold in view, and much better than a part of one.
+                if len(rec[j]["ids"]) + len(r["ids"]) > MERGE_CAP:
+                    continue
+                rec[j]["ids"] = sorted(rec[j]["ids"] + r["ids"])
+                del rec[k]
+                merged = True
+                break
+            if merged:
+                break
+
+    where = {id(r): k for k, r in enumerate(rec)}
+    return ([r["ids"] for r in rec],
+            [where[id(r["echo"])] if r["echo"] is not None else None for r in rec])
+
+
 def sections_from(labels: list[str | None], groups: list[list[int]],
                   n_lines: int) -> tuple[list[list[int]], list[int | None]]:
     """Cut the song into verses and choruses.
@@ -332,6 +377,7 @@ def sections_from(labels: list[str | None], groups: list[list[int]],
     breaks = {g[0] for g in groups}
     sections: list[list[int]] = []
     echo: list[int | None] = []
+    refrain_at: set[int] = set()
     first_refrain: int | None = None
 
     i = 0
@@ -340,6 +386,7 @@ def sections_from(labels: list[str | None], groups: list[list[int]],
             length = refrain[0]
             sections.append(list(range(i, i + length)))
             echo.append(None if first_refrain is None else first_refrain)
+            refrain_at.add(len(sections) - 1)
             if first_refrain is None:
                 first_refrain = len(sections) - 1
             i += length
@@ -352,4 +399,4 @@ def sections_from(labels: list[str | None], groups: list[list[int]],
             i += 1
         sections.append(run)
         echo.append(None)
-    return sections, echo
+    return _merge_stubs(sections, echo, refrain_at)

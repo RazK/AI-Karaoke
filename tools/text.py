@@ -23,7 +23,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from hollow.dress import QUOTE_END, anthropic_writer, dress
+from hollow.dress import (QUOTE_END, REPHRASE_START, anthropic_writer, dress,
+                          spent)
 from hollow.exam import score
 from hollow.library import Library
 
@@ -35,7 +36,7 @@ WIDTH = 44
 def dial_name(licence: float) -> str:
     if licence <= QUOTE_END:
         return "quote — only phrases the text already contains"
-    if licence < 0.75:
+    if licence < REPHRASE_START:
         return "blend — the text's own phrases where they fit, reworded where they do not"
     return "rephrase — the text's ideas, reworded to fit"
 
@@ -116,6 +117,14 @@ def main() -> int:
                     help="every library song against every bundled corpus")
     ap.add_argument("--dials", default="",
                     help="comma-separated dial settings, e.g. 0,0.5,1")
+    ap.add_argument("--model", default="claude-opus-5",
+                    help="the model that does the rewording above the quote end")
+    ap.add_argument("--effort", default="low",
+                    choices=["low", "medium", "high", "xhigh", "max"],
+                    help="how hard it thinks; thinking is billed as output, so "
+                         "this is the price dial")
+    ap.add_argument("--budget", type=float, default=4.0,
+                    help="stop before spending more than this many dollars")
     args = ap.parse_args()
 
     for name in (".env.local", ".env"):
@@ -137,7 +146,8 @@ def main() -> int:
         print(f"a dial above {QUOTE_END} needs ANTHROPIC_API_KEY in .env.local; "
               "below it, nothing is charged and no model is called", file=sys.stderr)
         return 1
-    writer = anthropic_writer() if any(d > QUOTE_END for d in dials) else None
+    writer = (anthropic_writer(args.model, args.effort)
+              if any(d > QUOTE_END for d in dials) else None)
 
     if args.all:
         pairs = [(s, c.stem) for s in songs for c in sorted(DATA.glob("*.txt"))]
@@ -159,9 +169,20 @@ def main() -> int:
             return 1
         h, originals = lib.hollow(song.ref), lib.originals(song.ref)
         for licence in dials:
+            if writer is not None and spent(writer.usage) >= args.budget:
+                print(f"stopping: ${spent(writer.usage):.2f} spent, budget is "
+                      f"${args.budget:.2f}", file=sys.stderr)
+                return 2
             build(song, h, originals, corpus, path.read_text(encoding="utf-8"),
                   licence, writer)
+            if writer is not None:
+                u = writer.usage
+                print(f"      running total: {u['calls']} calls, {u['in']} in, "
+                      f"{u['out']} out, ${spent(u):.2f} on {u['model']} at "
+                      f"{u['effort']} effort")
     print(f"\nwrote {OUT}/")
+    if writer is not None:
+        print(f"spent ${spent(writer.usage):.2f}")
     return 0
 
 

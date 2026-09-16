@@ -130,6 +130,11 @@ class Corpus:
             if _is_furniture(block):
                 continue
             first = len(words)
+            # A line of a list ends a thought even without a full stop. Without
+            # this, a span runs off the end of one item and into the next --
+            # "C between the two assembled side" -- which fits the tune and is
+            # not a sentence.
+            block = re.sub(r"\n(?=\s*\S)", ".\n", block)
             for token in re.findall(r"[A-Za-z][A-Za-z'’\-]*|\d+|[.!?;:,]", block):
                 if token[0].isalpha() or token[0].isdigit():
                     spoken = _say(token) if token[0].isdigit() else [token]
@@ -183,6 +188,12 @@ def _trim(c: Corpus, i: int, j: int, want: int) -> tuple[int, int]:
     return i, j
 
 
+def _cliff(c: Corpus, a: int, b: int) -> bool:
+    """Does this span end on a word still waiting for the one after it?"""
+    tail = " ".join(w.lower() for w in c.words[max(a, b - 3):b])
+    return any(tail.endswith(x) for x in TRAILING)
+
+
 def find(c: Corpus, line: Line, used: set[int],
          window: tuple[int, int] | None = None) -> list[Candidate]:
     """Every phrase in the corpus that could stand in for this line.
@@ -221,8 +232,13 @@ def find(c: Corpus, line: Line, used: set[int],
                 -6.0 * abs(n - want)          # fitting the melody dominates
                 + 3.0 * stress_fit
                 - 0.6 * unholdable
-                + (0.5 if a in c.starts else 0)
-                + (0.7 if b - 1 in c.ends else 0)
+                # Landing where the source itself starts and stops is worth
+                # far more than it used to be: a span that ends mid-noun-phrase
+                # ("Insert cam lock bolts into the pre-drilled") fits the tune
+                # and is half a sentence. There is no way to know a noun ends
+                # here, but there is a way to know the source stopped here.
+                + (0.8 if a in c.starts else 0)
+                + (1.5 if b - 1 in c.ends else 0)
                 # a phrase that opens or closes on a dangling "of" reads as a
                 # fragment cut out of something, which it is
                 # A leading "The" is ordinary English; a leading "Of" is the
@@ -236,7 +252,14 @@ def find(c: Corpus, line: Line, used: set[int],
                 # running through the end of one sentence and into the next is
                 # how you get "would not close The chef at": it fits the melody
                 # and is not English
-                - 2.5 * len(c.ends & set(range(a, b - 1)))
+                # Running through the end of one sentence and into the next is
+                # how "Step one of eighteen Lay" happens: it fits the tune, it
+                # is two halves of two different instructions, and it was only
+                # costing 2.5 against a 6.0 syllable miss, so it kept winning.
+                - 6.0 * len(c.ends & set(range(a, b - 1)))
+                # A phrase that ends on a quantifier whose noun is in the next
+                # sentence: "I have spent less on a full".
+                - (3.0 if _cliff(c, a, b) else 0)
                 - 1.2 * len(used & set(range(a, b))) / max(b - a, 1)
                 - 1.5 * abs((a + b) / 2 - home) / max(hi - lo, 1)
             )
@@ -286,9 +309,25 @@ RULES
 - A slot marked _ is held long. Put an open vowel there -- not a schwa, not a
   syllable ending in t/d/k/p/b/g.
 - Lines sharing a rhyme letter must rhyme with each other.
-- Every line must read as English on its own.
+- Every line must be a whole thought that can be read on its own. Never hand
+  back a sentence with its front or its end cut off to make the count: no line
+  may open on a preposition, end on a preposition, article, conjunction or
+  auxiliary verb, or end on "so much" / "one of" with the thing it counts
+  missing. Say something shorter and complete instead.
+- Write any number as the words someone would sing, and only when it belongs in
+  a line. "One eight zero" and "Two zero zero nine" are not English.
 
 Write those {n} rows now."""
+
+REPAIR = """\
+
+These rows came back wrong. The syllable counts below were done by a
+pronouncing dictionary on the words you wrote, so they are not up for
+argument. Rewrite only these rows, same rules as before, one per line,
+prefixed with the row number.
+
+{rows}
+"""
 
 FAITHFUL = """\
 Stay close to the source. Prefer its own words and phrases. You may drop words
@@ -346,30 +385,93 @@ def _repair(text: str, want: int) -> str:
 
 # ── where the writing comes from ───────────────────────────────────────────
 
+# Phrases that leave a line on a cliff: the quantifier arrives and the thing it
+# counts never does. "My wife's pasta had so much" is a sentence cut to length.
+TRAILING = (
+    "so much", "so many", "such a", "a lot of", "one of", "kind of", "sort of",
+    "out of", "much of", "plenty of", "full of", "none of", "most of",
+    "part of", "instead of", "because of", "in front of", "each of", "some of",
+    "all of", "as much", "as many", "more of", "rest of", "a full", "a whole",
+    "a single", "a real", "the same", "the whole", "the entire", "a bit",
+)
+# A line may open on "And" -- songs do it constantly. A line may not open on a
+# preposition: that is a sentence with its front cut off.
+STRANDED = prosody.BAD_OPENER - {"and", "or", "but", "nor", "so", "yet",
+                                 "because", "although", "though", "while", "when"}
+
+
+def ragged(text: str) -> str:
+    """Why this line cannot be read on its own, or "" when it can.
+
+    The writer is told to write English and mostly does, but under a syllable
+    count it will chop a sentence and hand back the half that fits. Saying so
+    costs nothing here and one short paid round to fix.
+    """
+    words = re.findall(r"[a-z']+", text.lower())
+    if not words:
+        return "it is empty"
+    if words[0] in STRANDED:
+        return f"it opens on {words[0]!r}, so it needs words before it that are not there"
+    if words[-1] in prosody.DANGLING:
+        return f"it ends on {words[-1]!r}, so it needs words after it that are not there"
+    joined = " ".join(words)
+    for phrase in TRAILING:
+        if joined.endswith(phrase):
+            return f"it ends on {phrase!r} and the thing it counts never arrives"
+    return ""
+
+
 class NeedsAnswer(Exception):
     """A manual writer was asked something and has not answered yet."""
 
 
-def anthropic_writer(model: str = "claude-opus-5"):
+# What the two models cost per million tokens, in and out, so a run can say
+# what it spent instead of guessing.
+RATES = {
+    "claude-opus-5": (5.0, 25.0),
+    "claude-sonnet-5": (2.0, 10.0),
+    "claude-haiku-4-5": (1.0, 5.0),
+}
+
+
+def anthropic_writer(model: str = "claude-opus-5", effort: str = "low"):
     """The writer, over the API. The key comes from the environment.
 
     What goes over the wire is a word-free HOLLOW rendering and a corpus the
     user supplied. No copyrighted lyric is ever part of it.
+
+    `effort` is the price dial, not `model`. Opus thinks before it answers
+    whether you ask it to or not, and that thinking is billed as output, so
+    effort moves the bill further than the choice of model does. Running totals
+    hang off `ask.usage` so the caller can stop before it spends the budget.
     """
     import os
 
     import anthropic
 
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    usage = {"model": model, "effort": effort, "calls": 0, "in": 0, "out": 0}
 
     def ask(prompt: str) -> str:
         r = client.messages.create(
-            model=model, max_tokens=8000,
+            model=model, max_tokens=16000,
+            output_config={"effort": effort},
             messages=[{"role": "user", "content": prompt}],
         )
-        return r.content[0].text
+        usage["calls"] += 1
+        usage["in"] += r.usage.input_tokens
+        usage["out"] += r.usage.output_tokens
+        # The first block can be a thinking block, which has no text.
+        return "".join(b.text for b in r.content if b.type == "text")
 
+    ask.usage = usage
     return ask
+
+
+def spent(usage: dict) -> float:
+    """What a writer's tokens cost, in dollars."""
+    rate_in, rate_out = RATES.get(usage.get("model", ""), (0.0, 0.0))
+    return (usage.get("in", 0) * rate_in + usage.get("out", 0) * rate_out) / 1e6
 
 
 def manual_writer(dir_path):
@@ -414,8 +516,27 @@ def manual_writer(dir_path):
 # At or below this the corpus's own words are the whole output and no model is
 # called. Above it, lines the corpus cannot fill go to the writer.
 QUOTE_END = 0.20
+# At and above this the writer writes every line of a section, and the corpus
+# is there for its subject and its voice rather than its sentences.
+REPHRASE_START = 0.75
 BEAM_WIDTH = 8
 CANDIDATES_PER_LINE = 12
+
+
+def rewrite_share(licence: float) -> float:
+    """How much of a section goes to the writer rather than being quoted.
+
+    The old rule was "ask the writer for the lines the corpus cannot fill", and
+    the corpus can nearly always fill a line with something, so the top of the
+    dial did almost nothing: 1.00 came back looking like 0.00. The dial has to
+    hand lines over on purpose. It gives away the worst-fitting quotes first,
+    so what stays quoted is what the source said well.
+    """
+    if licence <= QUOTE_END:
+        return 0.0
+    if licence >= REPHRASE_START:
+        return 1.0
+    return (licence - QUOTE_END) / (REPHRASE_START - QUOTE_END)
 
 
 def stress_bar(licence: float) -> float:
@@ -526,6 +647,25 @@ def _rows(h: Hollow, ids: list[int], filled: dict[int, str]) -> str:
 _ANSWER = re.compile(r"^\s*L?(\d+)\s*[:.\)]\s*(.+?)\s*$", re.M)
 
 
+def _missed(h: Hollow, lines: dict[int, str], ids: list[int]) -> list[str]:
+    """The rows that came back wrong, and what is wrong with each."""
+    out = []
+    for lid in ids:
+        if lid not in lines:
+            continue
+        want = len(h.lines[lid].slots)
+        text = lines[lid]
+        got = len(prosody.syllables_for(text, want))
+        if got != want:
+            out.append(f"L{lid:02d}: you wrote {text!r}, which is {got} written "
+                       f"syllables. It needs exactly {want}.")
+        elif (why := ragged(text)):
+            out.append(f"L{lid:02d}: you wrote {text!r}. That is the right "
+                       f"length, but {why}. Write a whole thought of exactly "
+                       f"{want} syllables instead.")
+    return out
+
+
 def dress(
     h: Hollow,
     corpus_text: str,
@@ -552,18 +692,32 @@ def dress(
     used: set[int] = set()
     unanswered: list[str] = []
 
+    share = rewrite_share(licence) if writer is not None else 0.0
+
     for k, si in enumerate(distinct):
         ids = sections[si]
         picks = _beam(c, h, ids, windows[k], used)
+        fits: dict[int, Candidate] = {}
         gap: list[int] = []
         for lid, cand in zip(ids, picks):
             want = len(h.lines[lid].slots)
             if cand and cand.n == want and cand.stress_fit >= bar:
-                lines[lid] = cand.text
-                lifted.add(lid)
-                used.update(range(cand.i, cand.j))
+                fits[lid] = cand
             else:
                 gap.append(lid)
+
+        over = round(share * len(ids)) - len(gap)
+        if over > 0:
+            weakest = sorted(fits, key=lambda i: (fits[i].stress_fit, fits[i].score))
+            for lid in weakest[:over]:
+                del fits[lid]
+                gap.append(lid)
+        gap.sort()
+
+        for lid, cand in fits.items():
+            lines[lid] = cand.text
+            lifted.add(lid)
+            used.update(range(cand.i, cand.j))
 
         if gap and writer is not None and licence > QUOTE_END:
             before = lines.get(sections[distinct[k - 1]][-1]) if k else None
@@ -583,6 +737,20 @@ def dress(
                 lid = int(m.group(1))
                 if lid in gap:
                     lines[lid] = m.group(2).strip(' "')
+
+            # The counting happens on this machine, so the model is never paid
+            # to check its own arithmetic -- only to fix what really missed.
+            missed = _missed(h, lines, gap)
+            if missed:
+                try:
+                    reply = writer(prompt + REPAIR.format(rows="\n".join(missed)))
+                except NeedsAnswer as need:
+                    unanswered.append(str(need))
+                    reply = ""
+                for m in _ANSWER.finditer(reply):
+                    lid = int(m.group(1))
+                    if lid in gap:
+                        lines[lid] = m.group(2).strip(' "')
 
         # Anything the writer did not fill takes the best phrase going.
         for lid, cand in zip(ids, picks):

@@ -59,14 +59,20 @@ alone, which is the sharpest test of whether it carries enough.
 
 One control: **licence**, 0 to 1.
 
-At 0 the system searches the corpus's own word runs for phrases whose syllable
-count and stress pattern already fit a line, trims them lightly, and never calls
-a model — recognisably IKEA, stilted, funny because it is real. At 1 it hands
-every line to the writer, which may paraphrase, pad, pun and coin words. In
-between, the bar a lifted phrase has to clear rises with the dial.
+A song is written a **section at a time**, out of one stretch of the source, so
+that consecutive lines are about the same thing. Anything the song repeats — the
+chorus — is written once and copied to every later occurrence, unchanged.
 
-Across the nine handover songs that moves corpus fidelity 98–100% at licence
-0.00, 54–79% at 0.60, 31–56% at 1.00.
+At 0 the system runs a beam search over the corpus's own word runs, choosing a
+whole section at once, preferring phrases that carry on from the previous line's
+phrase; it never calls a model — recognisably IKEA, stilted, funny because it is
+real. At 1 it hands every line to the writer, which may paraphrase, pad, pun and
+coin words. In between it hands over the worst-fitting quotes first, so what
+stays quoted is what the source said well.
+
+On Never Gonna Give You Up that moves lines lifted whole from the corpus from
+41–45 of 47 at licence 0.00, to 10 of 47 at 0.60, to 0 at 1.00 — while the
+singability score holds at 9.2–9.7 out of 10 at every setting.
 
 Fitting the melody is not on the dial. It is a hard constraint with one escape
 hatch: a line that cannot be filled falls back to the closest phrase the corpus
@@ -132,12 +138,14 @@ hollow/          the core
   ingest.py      karaoke file or YouTube URL; both end at the same file
   exam.py        the singability exam and its four calibration cases
   dress.py       corpus -> lines, the licence dial, declared bends
+                 (beam search, section windows, and the writer over the API)
   grade.py       the card
   library.py     songs, dressings and ratings on disk
 app/             the stage
 sing/            renders a HOLLOW file back as a sung vocal
 tools/           seeders, the nine, and a checker for whoever writes lines
-tests/           49 tests, including the acceptance tests
+tests/           101 tests, including the acceptance tests and the dial's
+                 invariants (test_dial.py)
 docs/            prior art, and one page on what this turned out to be
 ```
 
